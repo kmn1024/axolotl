@@ -9,23 +9,11 @@ load_in_4bit: false
 strict: false
 
 datasets:
-  - path: '/home/ck/Downloads/convo_pygmalion/CoT-Collection.jsonl'
-    name: 'CoT-Collection'
-    type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion/koishi-dolly.jsonl'
-    name: 'koishi-dolly'
-    type: pygmalion
   - path: '/home/ck/Downloads/convo_pygmalion/koishi-flan.jsonl'
     name: 'koishi-flan'
     type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion/koishi-gpteacher.jsonl'
-    name: 'koishi-gpteacher'
-    type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion/koishi-hh-rlhf.jsonl'
-    name: 'koishi-hh-rlhf'
-    type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion/natural-instructions-2.8.jsonl'
-    name: 'natural-instructions'
+  - path: '/home/ck/Downloads/convo_pygmalion/koishi-dolly.jsonl'
+    name: 'koishi-dolly'
     type: pygmalion
 
 dataset_prepared_path:
@@ -43,16 +31,16 @@ wandb_run_id: demo1
 wandb_log_model:
 
 gradient_accumulation_steps: 1
-micro_batch_size: 1024
-num_epochs: 2
+micro_batch_size: 2
+num_epochs: 1
 optimizer: adamw_torch
 lr_scheduler: cosine
-learning_rate: 0.0001
+learning_rate: 0.0003
 
 train_on_inputs: false
 group_by_length: false
-bf16: true
-fp16: false
+bf16: false
+fp16: true
 tf32: false
 
 gradient_checkpointing: true
@@ -63,7 +51,7 @@ logging_steps: 1
 xformers_attention:
 flash_attention: true
 
-warmup_steps: 30
+warmup_steps: 100
 eval_steps: 0.05
 eval_table_size:
 eval_table_max_new_tokens:

@@ -166,4 +166,4 @@ cython_debug/
 # wandb creates a folder to store logs for training runs
 wandb
 
-axolotl/
+last_run_prepared/
