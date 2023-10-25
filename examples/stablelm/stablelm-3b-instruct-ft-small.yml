@@ -9,14 +9,14 @@ load_in_4bit: false
 strict: false
 
 datasets:
-  - path: '/home/ck/Downloads/convo_pygmalion/koishi-flan.jsonl'
+  - path: '/home/ck/Downloads/convo_pygmalion_small/koishi-flan.jsonl'
     name: 'koishi-flan'
     type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion/koishi-dolly.jsonl'
+  - path: '/home/ck/Downloads/convo_pygmalion_small/koishi-dolly.jsonl'
     name: 'koishi-dolly'
     type: pygmalion
 
-dataset_prepared_path:
+dataset_prepared_path: dataset_prepared_path
 val_set_size: 0.05
 output_dir: ./stablelm-3b-instruct
 
