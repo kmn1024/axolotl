@@ -1,0 +1,67 @@
+base_model: stabilityai/stablelm-3b-4e1t
+base_model_config: stabilityai/stablelm-3b-4e1t
+model_type: StableLMEpochForCausalLM
+tokenizer_type: AutoTokenizer
+trust_remote_code: true
+
+load_in_8bit: false
+load_in_4bit: false
+strict: false
+
+datasets:
+  - path: '/home/ck/Downloads/convo_pygmalion/CoT-Collection.jsonl'
+    name: 'CoT-Collection'
+    type: pygmalion
+  - path: '/home/ck/Downloads/convo_pygmalion/koishi-dolly.jsonl'
+    name: 'koishi-dolly'
+    type: pygmalion
+
+dataset_prepared_path:
+val_set_size: 0.05
+output_dir: ./stablelm-3b-instruct
+
+sequence_len: 4096
+sample_packing: true
+pad_to_sequence_len: true
+
+wandb_project: stablelm-3b-instruct-demo1
+wandb_entity:
+wandb_watch:
+wandb_run_id: demo1
+wandb_log_model:
+
+gradient_accumulation_steps: 1
+micro_batch_size: 2
+num_epochs: 1
+optimizer: adamw_torch
+lr_scheduler: cosine
+learning_rate: 0.0003
+
+train_on_inputs: false
+group_by_length: false
+bf16: false
+fp16: true
+tf32: false
+
+gradient_checkpointing: true
+early_stopping_patience:
+resume_from_checkpoint:
+local_rank:
+logging_steps: 1
+xformers_attention:
+flash_attention: true
+
+warmup_steps: 100
+eval_steps: 0.05
+eval_table_size:
+eval_table_max_new_tokens:
+save_steps:
+debug:
+deepspeed: deepspeed/zero2.json
+weight_decay: 0.0
+fsdp:
+fsdp_config:
+tokens:
+  - "<|system|>"
+  - "<|user|>"
+  - "<|model|>"
