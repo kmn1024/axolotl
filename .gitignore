@@ -167,3 +167,4 @@ cython_debug/
 wandb
 
 last_run_prepared/
+models/

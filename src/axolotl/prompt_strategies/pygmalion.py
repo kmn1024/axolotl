@@ -30,8 +30,12 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
 
     def tokenize_prompt(self, prompt):
         result, current_len = tokenize_prompt_default()
-        for _, part in enumerate(self.prompter.build_prompt(prompt["conversations"])):
-            role, message = part
+        conversations = self.prompter.build_prompt(prompt["conversations"])
+    
+        i = 0
+        started_dialogue = False
+        while i < len(conversations):
+            role, message = conversations[i]
             if role == "system":
                 prefix = "<|system|>"
                 # this should include a bos token, no eos token, strip trailing "\n<START>"
@@ -44,39 +48,64 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
                 )
                 # everything from this is masked out from the labels
                 labels = [IGNORE_TOKEN_ID] * len(res["input_ids"])
+                # pylint: disable=duplicate-code
+                result, current_len = parse_tokenized_to_result(
+                    result,
+                    current_len,
+                    res,
+                    labels,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                )
+                i += 1
             elif role == "human":
-                prefix = "<|user|>"
-                res = self._tokenize(
-                    prefix + " " + message.strip(),
+                assert i + 1 < len(conversations)
+                bot_role, bot_message = conversations[i+1]
+                assert bot_role == "bot"
+               
+                user_prefix = "<|user|>"
+                user_res = self._tokenize(
+                    user_prefix + " " + message.strip(),
                     add_eos_token=False,
                     strip_bos_token=True,
                 )
                 # everything from this is masked out from the labels
-                labels = [IGNORE_TOKEN_ID] * len(res["input_ids"])
-            elif role == "bot":
-                prefix = "<|model|>"
-                res = self._tokenize(
-                    prefix + " " + message.strip(),
+                user_labels = [IGNORE_TOKEN_ID] * len(user_res["input_ids"])
+
+                bot_prefix = "<|model|>"
+                bot_res = self._tokenize(
+                    bot_prefix + " " + bot_message.strip(),
                     add_eos_token=True,
                     strip_bos_token=True,
                 )
                 # mask out the prefix token, rest is not masked out from labels
                 # make sure we create the labels first, otherwise we get incorrect lengths
-                labels = [IGNORE_TOKEN_ID] * len(self.bot_prefix_token_ids) + [
-                    *copy.deepcopy(res["input_ids"])
+                bot_labels = [IGNORE_TOKEN_ID] * len(self.bot_prefix_token_ids) + [
+                    *copy.deepcopy(bot_res["input_ids"])
                 ][len(self.bot_prefix_token_ids) :]
-            else:
-                LOG.warning(f"unknown role in conversation: {role}")
-                res = defaultdict(lambda: [])
 
-            # pylint: disable=duplicate-code
-            result, current_len = parse_tokenized_to_result(
-                result,
-                current_len,
-                res,
-                labels,
-                pad_token_id=self.tokenizer.pad_token_id,
-            )
+                incremental_len = len(user_res["input_ids"]) + len(bot_res["input_ids"])
+                if not started_dialogue or current_len + incremental_len < self.sequence_len:
+                    started_dialogue = True
+                    result, current_len = parse_tokenized_to_result(
+                        result,
+                        current_len,
+                        user_res,
+                        user_labels,
+                        pad_token_id=self.tokenizer.pad_token_id,
+                    )
+                    result, current_len = parse_tokenized_to_result(
+                        result,
+                        current_len,
+                        bot_res,
+                        bot_labels,
+                        pad_token_id=self.tokenizer.pad_token_id,
+                    )
+                else:
+                    LOG.warning(f"Pygmalion truncate dialogue!")
+                    break
+                i += 2
+            else:
+                assert False, f"unknown role in conversation: {role}"
         return result
 
 
