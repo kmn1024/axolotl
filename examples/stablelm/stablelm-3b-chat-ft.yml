@@ -1,0 +1,89 @@
+base_model: stabilityai/stablelm-3b-4e1t
+base_model_config: stabilityai/stablelm-3b-4e1t
+model_type: StableLMEpochForCausalLM
+tokenizer_type: AutoTokenizer
+trust_remote_code: true
+
+load_in_8bit: false
+load_in_4bit: false
+strict: false
+
+datasets:
+  - path: '/home/ck/git/profanity_local/post_processed/convo_pygmalion/airboros-3.1.jsonl'
+    name: 'airboros'
+    type: pygmalion
+  - path: '/home/ck/git/profanity_local/post_processed/convo_pygmalion/dolphin-flan1m-alpaca-uncensored-deduped.jsonl'
+    name: 'dolphin-flan1m'
+    type: pygmalion
+  - path: '/home/ck/git/profanity_local/post_processed/convo_pygmalion/soda_test.jsonl'
+    name: 'soda_test'
+    type: pygmalion
+  - path: '/home/ck/git/profanity_local/post_processed/convo_pygmalion/soda_train.jsonl'
+    name: 'soda_train'
+    type: pygmalion
+  - path: '/home/ck/git/profanity_local/post_processed/convo_pygmalion/soda_validate.jsonl'
+    name: 'soda_validate'
+    type: pygmalion
+  - path: '/home/ck/git/profanity_local/post_processed/convo_pygmalion/ultrachat.jsonl'
+    name: 'ultrachat'
+    type: pygmalion
+  - path: '/home/ck/git/profanity_local/post_processed/convo_pygmalion/gpt_roleplay_realm-en.jsonl'
+    name: 'gpt_roleplay_realm'
+    type: pygmalion
+  - path: '/home/ck/git/profanity_local/post_processed/convo_pygmalion/samantha-1.1.jsonl'
+    name: 'samantha'
+    type: pygmalion
+
+dataset_prepared_path: /tmp/dataset_prepared_path
+val_set_size: 0.05
+output_dir: ./stablelm-3b-chat
+
+sequence_len: 4096
+sample_packing: true
+pad_to_sequence_len: true
+
+wandb_project: stablelm-3b-chat-full
+wandb_entity:
+wandb_watch:
+wandb_run_id: run1
+wandb_log_model:
+
+gradient_accumulation_steps: 1
+micro_batch_size: 8
+num_epochs: 2
+optimizer: adamw_torch
+adam_beta1: 0.9
+adam_beta2: 0.95
+adam_epsilon: 0.000001  # 0.00001 for better stability
+lr_scheduler: cosine
+learning_rate: 0.0001
+weight_decay: 0.1
+max_grad_norm: 1.0
+
+train_on_inputs: false
+group_by_length: false
+bf16: true
+fp16: false
+tf32: false
+
+gradient_checkpointing: true
+early_stopping_patience:
+resume_from_checkpoint:
+local_rank:
+logging_steps: 1
+xformers_attention:
+flash_attention: true
+
+warmup_steps: 100
+eval_steps: 0.05
+eval_table_size:
+eval_table_max_new_tokens:
+save_steps:
+debug:
+deepspeed: deepspeed/zero2.json
+fsdp:
+fsdp_config:
+tokens:
+  - "<|system|>"
+  - "<|user|>"
+  - "<|model|>"
