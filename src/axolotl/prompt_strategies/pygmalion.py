@@ -32,10 +32,9 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
         result, current_len = tokenize_prompt_default()
         conversations = self.prompter.build_prompt(prompt["conversations"])
     
-        i = 0
         started_dialogue = False
-        while i < len(conversations):
-            role, message = conversations[i]
+        while (next_item := next(conversations, None)) is not None:
+            role, message = next_item
             if role == "system":
                 prefix = "<|system|>"
                 # this should include a bos token, no eos token, strip trailing "\n<START>"
@@ -56,10 +55,10 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
                     labels,
                     pad_token_id=self.tokenizer.pad_token_id,
                 )
-                i += 1
             elif role == "human":
-                assert i + 1 < len(conversations)
-                bot_role, bot_message = conversations[i+1]
+                next_next_item = next(conversations, None)
+                assert next_next_item is not None
+                bot_role, bot_message = next_next_item
                 assert bot_role == "bot"
                
                 user_prefix = "<|user|>"
@@ -103,7 +102,6 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
                 else:
                     LOG.warning(f"Pygmalion truncate dialogue!")
                     break
-                i += 2
             else:
                 assert False, f"unknown role in conversation: {role}"
         return result
