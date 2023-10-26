@@ -31,7 +31,7 @@ wandb_run_id: demo3
 wandb_log_model:
 
 gradient_accumulation_steps: 1
-micro_batch_size: 16
+micro_batch_size: 8
 num_epochs: 1
 optimizer: adamw_torch
 adam_beta1: 0.9
