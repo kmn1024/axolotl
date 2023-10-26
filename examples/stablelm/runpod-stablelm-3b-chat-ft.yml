@@ -9,34 +9,34 @@ load_in_4bit: false
 strict: false
 
 datasets:
-  - path: '/home/ck/Downloads/convo_pygmalion_chat/airboros-3.1.jsonl'
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat/airboros-3.1.jsonl'
     name: 'airboros'
     type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion_chat/dolphin-flan1m-alpaca-uncensored-deduped.jsonl'
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat/dolphin-flan1m-alpaca-uncensored-deduped.jsonl'
     name: 'dolphin-flan1m'
     type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion_chat/soda_test.jsonl'
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat/soda_test.jsonl'
     name: 'soda_test'
     type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion_chat/soda_train.jsonl'
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat/soda_train.jsonl'
     name: 'soda_train'
     type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion_chat/soda_validate.jsonl'
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat/soda_validate.jsonl'
     name: 'soda_validate'
     type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion_chat/ultrachat.jsonl'
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat/ultrachat.jsonl'
     name: 'ultrachat'
     type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion_chat/gpt_roleplay_realm-en.jsonl'
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat/gpt_roleplay_realm-en.jsonl'
     name: 'gpt_roleplay_realm'
     type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion_chat/samantha-1.1.jsonl'
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat/samantha-1.1.jsonl'
     name: 'samantha'
     type: pygmalion
 
-dataset_prepared_path: /tmp/dataset_prepared_path
+dataset_prepared_path: /workspace/dataset_prepared_path
 val_set_size: 0.05
-output_dir: ./stablelm-3b-chat
+output_dir: /workspace/stablelm-3b-chat
 
 sequence_len: 4096
 sample_packing: true
@@ -74,7 +74,7 @@ logging_steps: 1
 xformers_attention:
 flash_attention: true
 
-warmup_steps: 150
+warmup_steps: 100
 eval_steps: 0.05
 eval_table_size:
 eval_table_max_new_tokens:
