@@ -28,7 +28,7 @@ datasets:
     name: 'natural-instructions'
     type: pygmalion
 
-dataset_prepared_path: dataset_prepared_path
+dataset_prepared_path: /tmp/dataset_prepared_path
 val_set_size: 0.05
 output_dir: ./stablelm-3b-instruct
 
@@ -36,18 +36,23 @@ sequence_len: 4096
 sample_packing: true
 pad_to_sequence_len: true
 
-wandb_project: stablelm-3b-instruct-demo1
+wandb_project: stablelm-3b-instruct-full
 wandb_entity:
 wandb_watch:
-wandb_run_id: demo1
+wandb_run_id: run1
 wandb_log_model:
 
 gradient_accumulation_steps: 1
-micro_batch_size: 1024
+micro_batch_size: 16
 num_epochs: 2
 optimizer: adamw_torch
+adam_beta1: 0.9
+adam_beta2: 0.95
+adam_epsilon: 0.000001  # 0.00001 for better stability
 lr_scheduler: cosine
 learning_rate: 0.0001
+weight_decay: 0.1
+max_grad_norm: 1.0
 
 train_on_inputs: false
 group_by_length: false
@@ -63,14 +68,13 @@ logging_steps: 1
 xformers_attention:
 flash_attention: true
 
-warmup_steps: 30
+warmup_steps: 100
 eval_steps: 0.05
 eval_table_size:
 eval_table_max_new_tokens:
 save_steps:
 debug:
 deepspeed: deepspeed/zero2.json
-weight_decay: 0.0
 fsdp:
 fsdp_config:
 tokens:

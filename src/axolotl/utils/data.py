@@ -496,7 +496,6 @@ def load_prepare_datasets(
 
     LOG.info(f"total size: {dataset.num_rows}")
     if cfg.val_set_size:
-        LOG.info("here1")
         # ensure we end up with the same fingerprint by doing rank0 first and being able to cache
         to_hash_train = (
             dataset._fingerprint  # pylint: disable=protected-access
@@ -518,7 +517,6 @@ def load_prepare_datasets(
         )
         train_fingerprint = md5(to_hash_train)
         test_fingerprint = md5(to_hash_test)
-        LOG.info("here2")
         with zero_first(is_main_process()):
             dataset = dataset.train_test_split(
                 test_size=cfg.val_set_size,
@@ -527,7 +525,6 @@ def load_prepare_datasets(
                 train_new_fingerprint=train_fingerprint,
                 test_new_fingerprint=test_fingerprint,
             )
-        LOG.info("here3")
         train_dataset = dataset["train"]
         eval_dataset = dataset["test"]
     else:
