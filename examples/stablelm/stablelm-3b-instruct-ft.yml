@@ -9,22 +9,22 @@ load_in_4bit: false
 strict: false
 
 datasets:
-  - path: '/home/ck/Downloads/convo_pygmalion/CoT-Collection.jsonl'
+  - path: '/home/ck/Downloads/convo_pygmalion_instruct/CoT-Collection.jsonl'
     name: 'CoT-Collection'
     type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion/koishi-dolly.jsonl'
+  - path: '/home/ck/Downloads/convo_pygmalion_instruct/koishi-dolly.jsonl'
     name: 'koishi-dolly'
     type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion/koishi-flan.jsonl'
+  - path: '/home/ck/Downloads/convo_pygmalion_instruct/koishi-flan.jsonl'
     name: 'koishi-flan'
     type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion/koishi-gpteacher.jsonl'
+  - path: '/home/ck/Downloads/convo_pygmalion_instruct/koishi-gpteacher.jsonl'
     name: 'koishi-gpteacher'
     type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion/koishi-hh-rlhf.jsonl'
+  - path: '/home/ck/Downloads/convo_pygmalion_instruct/koishi-hh-rlhf.jsonl'
     name: 'koishi-hh-rlhf'
     type: pygmalion
-  - path: '/home/ck/Downloads/convo_pygmalion/natural-instructions-2.8.jsonl'
+  - path: '/home/ck/Downloads/convo_pygmalion_instruct/natural-instructions-2.8.jsonl'
     name: 'natural-instructions'
     type: pygmalion
 
