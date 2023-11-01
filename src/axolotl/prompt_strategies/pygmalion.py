@@ -2,6 +2,7 @@
 
 import copy
 import logging
+import random
 from collections import defaultdict
 from typing import Generator, List, Tuple
 
@@ -14,7 +15,7 @@ from axolotl.prompt_tokenizers import (
 LOG = logging.getLogger("axolotl")
 
 IGNORE_TOKEN_ID = -100
-
+RANDOM_INJECT_SYSTEM_RATE = 0.2
 
 class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
     """
@@ -26,44 +27,59 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
     def __init__(self, prompter, tokenizer, *args, **kwargs):
         super().__init__(prompter, tokenizer, *args, **kwargs)
         res = self._tokenize("<|model|>", add_eos_token=False, strip_bos_token=True)
-        self.bot_prefix_token_ids = res["input_ids"]
+        self.bot_prefix_token_ids = res["input_ids"]      
 
     def tokenize_prompt(self, prompt):
         result, current_len = tokenize_prompt_default()
         conversations = self.prompter.build_prompt(prompt["conversations"])
+        system_res, system_labels = None, None
+        prev_message_is_system = False
     
         started_dialogue = False
         while (next_item := next(conversations, None)) is not None:
             role, message = next_item
             if role == "system":
+                prev_message_is_system = True
                 prefix = "<|system|>"
                 # this should include a bos token, no eos token, strip trailing "\n<START>"
                 if message.endswith("\n<START>"):
                     message = message[:-8]
-                res = self._tokenize(
+                system_res = self._tokenize(
                     prefix + "Persona: " + message.strip(),
                     add_eos_token=False,
                     strip_bos_token=False,
                 )
                 # everything from this is masked out from the labels
-                labels = [IGNORE_TOKEN_ID] * len(res["input_ids"])
+                system_labels = [IGNORE_TOKEN_ID] * len(system_res["input_ids"])
                 # pylint: disable=duplicate-code
                 result, current_len = parse_tokenized_to_result(
                     result,
                     current_len,
-                    res,
-                    labels,
+                    system_res,
+                    system_labels,
                     pad_token_id=self.tokenizer.pad_token_id,
                 )
             elif role == "human":
+                if system_res and not prev_message_is_system and random.random() <= RANDOM_INJECT_SYSTEM_RATE:
+                    prev_message_is_system = True
+                    result, current_len = parse_tokenized_to_result(
+                        result,
+                        current_len,
+                        system_res,
+                        system_labels,
+                        pad_token_id=self.tokenizer.pad_token_id,
+                    )
+
+                prev_message_is_system = False
                 next_next_item = next(conversations, None)
                 assert next_next_item is not None
                 bot_role, bot_message = next_next_item
                 assert bot_role == "bot"
                
                 user_prefix = "<|user|>"
+                user_message = self.perturber.perturb_text(message.strip())
                 user_res = self._tokenize(
-                    user_prefix + " " + message.strip(),
+                    user_prefix + " " + user_message,
                     add_eos_token=False,
                     strip_bos_token=True,
                 )

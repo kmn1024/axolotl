@@ -12,21 +12,27 @@ datasets:
   - path: '/home/ck/Downloads/convo_pygmalion_instruct/CoT-Collection.jsonl'
     name: 'CoT-Collection'
     type: pygmalion
+    ds_type: 'jsonl'
   - path: '/home/ck/Downloads/convo_pygmalion_instruct/koishi-dolly.jsonl'
     name: 'koishi-dolly'
     type: pygmalion
+    ds_type: 'jsonl'
   - path: '/home/ck/Downloads/convo_pygmalion_instruct/koishi-flan.jsonl'
     name: 'koishi-flan'
     type: pygmalion
+    ds_type: 'jsonl'
   - path: '/home/ck/Downloads/convo_pygmalion_instruct/koishi-gpteacher.jsonl'
     name: 'koishi-gpteacher'
     type: pygmalion
+    ds_type: 'jsonl'
   - path: '/home/ck/Downloads/convo_pygmalion_instruct/koishi-hh-rlhf.jsonl'
     name: 'koishi-hh-rlhf'
     type: pygmalion
+    ds_type: 'jsonl'
   - path: '/home/ck/Downloads/convo_pygmalion_instruct/natural-instructions-2.8.jsonl'
     name: 'natural-instructions'
     type: pygmalion
+    ds_type: 'jsonl'
 
 dataset_prepared_path: /tmp/dataset_prepared_path
 val_set_size: 0.05

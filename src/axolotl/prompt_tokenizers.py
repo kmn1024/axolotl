@@ -7,6 +7,7 @@ from typing import Dict, List, Tuple, Union
 
 from fastchat.conversation import Conversation
 from transformers import BatchEncoding, PreTrainedTokenizer
+from axolotl.utils.perturb_text import Perturber
 
 from axolotl.monkeypatch.fastchat_conversation_turns import (
     add_get_turns_to_conversation,
@@ -49,6 +50,7 @@ class PromptTokenizingStrategy(abc.ABC):
         # TODO: Document how they are different.
         self.sequence_len = sequence_len
         self.max_length = sequence_len
+        self.perturber = Perturber()
 
     @abc.abstractmethod
     def tokenize_prompt(self, prompt):

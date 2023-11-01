@@ -49,6 +49,7 @@ class CompletionPromptTokenizingStrategy(InstructionPromptTokenizingStrategy):
                 _,
             ) = self.parse_instruction_fields(prompt_row)
 
+            instruction = self.perturber.perturb_text(instruction)
             full_prompt = self._build_full_prompt(instruction, None, None)
             tokenized_full_prompt = self._tokenize(full_prompt)
 
@@ -84,7 +85,8 @@ def load(tokenizer, cfg, ds_cfg: Optional[Dict[str, Any]] = None):
         tokenizer,
         cfg.train_on_inputs,
         cfg.sequence_len,
-        max_length=cfg.sequence_len * 64,
+        #max_length=cfg.sequence_len * 64,
+        max_length=cfg.sequence_len * 128,
     )
     if ds_cfg and "field" in ds_cfg:
         strat.field = ds_cfg["field"]
