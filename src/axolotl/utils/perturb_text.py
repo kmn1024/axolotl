@@ -1,6 +1,7 @@
 import json
 import nltk
 import random
+import tarfile
 import unicodedata
 
 import numpy as np
@@ -56,17 +57,17 @@ def is_newline(s):
             return False
     return True
 
-HOMOPHONE_FILE = '/home/ck/git/trl/working/homophones/filtered_homophones.jsonl'
+HOMOPHONE_FILE = './filtered_dist_homophones.tar.gz'
 
 class Perturber:
     def __init__(self):
         print('Creating Perturber')
         self.homophones = {}
-        with open(HOMOPHONE_FILE, 'r') as f:
-            for l in f.readlines():
-                self.homophones |= json.loads(l.strip())
-        #self.perturb_schedule = list(np.arange(0.12, 0.0399, -0.02))
-        self.perturb_schedule = list(np.arange(999, 0.0, -0.01))
+        with tarfile.open(HOMOPHONE_FILE, 'r:gz') as tar:
+            with tar.extractfile('filtered_dist_homophones.jsonl') as f:
+                for l in f.readlines():
+                    self.homophones |= json.loads(l.strip())
+        self.perturb_schedule = list(np.arange(0.12, 0.01, -0.02))
         self.deletion_prob = 0.3
         self.repeat_prob = 0.2
 
@@ -105,6 +106,8 @@ class Perturber:
                     perturbed = tokens[idx]
                     if homophones:
                         perturbed = transfer_capitalization(perturbed, random.choice(homophones))
+                    else:
+                        perturb_idx -= 1
                     new_tokens.append(perturbed)
                     new_separators.append(separators[idx])
             else:
