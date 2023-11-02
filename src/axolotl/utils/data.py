@@ -226,6 +226,11 @@ def pack_and_pad(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: Dict[
     buffer_attention_mask = torch.tensor([], dtype=torch.long)
 
     for ids, mask in zip(input_ids, attention_mask):
+        # Drop entries that are too long.
+        if ids.numel() > max_tokens:
+            LOG.warning(f'pack_and_pad skip long input: {ids.numel()} > {max_tokens}')
+            continue
+        
         if buffer_input_ids.numel() == max_tokens:
             new_input_ids.append(buffer_input_ids)
             new_attention_mask.append(buffer_attention_mask)
