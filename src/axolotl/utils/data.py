@@ -291,7 +291,7 @@ def load_tokenized_prepared_datasets_local_stream(
 def load_tokenized_prepared_datasets(
     tokenizer, cfg, default_dataset_prepared_path
 ) -> DatasetDict:
-    if cfg.datasets.local_streaming_datasets:
+    if cfg.local_streaming_datasets:
         return load_tokenized_prepared_datasets_local_stream(tokenizer, cfg)
     tokenizer_name = tokenizer.__class__.__name__
     ds_hash = str(

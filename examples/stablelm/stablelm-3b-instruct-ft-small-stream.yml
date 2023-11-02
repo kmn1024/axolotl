@@ -8,8 +8,8 @@ load_in_8bit: false
 load_in_4bit: false
 strict: false
 
+local_streaming_datasets: True
 datasets:
-  local_streaming_datasets: True
   - path: '/home/ck/Downloads/convo_pygmalion_small/koishi-flan.jsonl'
     name: 'koishi-flan'
     type: pygmalion
