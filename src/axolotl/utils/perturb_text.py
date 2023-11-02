@@ -3,6 +3,7 @@ import nltk
 import random
 import tarfile
 import unicodedata
+import os
 
 import numpy as np
 from unidecode import unidecode
@@ -58,12 +59,13 @@ def is_newline(s):
             return False
     return True
 
-HOMOPHONE_FILE = './filtered_dist_homophones.tar.gz'
+HOMOPHONE_FILE = './src/axolotl/utils/filtered_dist_homophones.tar.gz'
 
 class Perturber:
     def __init__(self):
         print('Creating Perturber')
         self.homophones = {}
+        assert os.path.isfile(HOMOPHONE_FILE), HOMOPHONE_FILE
         with tarfile.open(HOMOPHONE_FILE, 'r:gz') as tar:
             with tar.extractfile('filtered_dist_homophones.jsonl') as f:
                 for l in f.readlines():

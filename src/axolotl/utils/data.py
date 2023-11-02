@@ -119,20 +119,19 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
             f"no train split found for dataset {d.path}, you may specify a split with 'train_on_split: `"
         )
     if (
-        is_streaming
+        not is_streaming
         and "input_ids" in ds.features
         and "attention_mask" in ds.features
         and "labels" in ds.features
     ):
         # dataset is already tokenized, just drop it straight in
         return ds
-    elif isinstance(d.type, DictDefault):
+    
+    ds_strategy = None
+    if isinstance(d.type, DictDefault):
         ds_strategy = load("user_defined", tokenizer, cfg, d.type.to_dict())
-        ds_wrapper = TokenizedPromptDataset(ds_strategy, ds, cfg.dataset_columns if is_streaming else None)
-        return ds_wrapper
     elif ds_strategy := load(d.type, tokenizer, cfg, d):
-        ds_wrapper = TokenizedPromptDataset(ds_strategy, ds, cfg.dataset_columns if is_streaming else None)
-        return ds_wrapper
+        pass
     elif d_base_type == "alpaca":
         ds_strategy = AlpacaPromptTokenizingStrategy(
             AlpacaPrompter(d_prompt_style),
@@ -140,8 +139,6 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
             cfg.train_on_inputs,
             cfg.sequence_len,
         )
-        ds_wrapper = TokenizedPromptDataset(ds_strategy, ds, cfg.dataset_columns if is_streaming else None)
-        return ds_wrapper
     elif d_base_type == "explainchoice":
         ds_strategy = AlpacaMultipleChoicePromptTokenizingStrategy(
             MultipleChoiceExplainPrompter(d_prompt_style),
@@ -149,8 +146,6 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
             cfg.train_on_inputs,
             cfg.sequence_len,
         )
-        ds_wrapper = TokenizedPromptDataset(ds_strategy, ds, cfg.dataset_columns if is_streaming else None)
-        return ds_wrapper
     elif d_base_type == "concisechoice":
         ds_strategy = AlpacaMultipleChoicePromptTokenizingStrategy(
             MultipleChoiceConcisePrompter(d_prompt_style),
@@ -158,8 +153,6 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
             cfg.train_on_inputs,
             cfg.sequence_len,
         )
-        ds_wrapper = TokenizedPromptDataset(ds_strategy, ds, cfg.dataset_columns if is_streaming else None)
-        return ds_wrapper
     elif d_base_type == "summarizetldr":
         ds_strategy = SummarizeTLDRPromptTokenizingStrategy(
             SummarizeTLDRPrompter(d_prompt_style),
@@ -167,8 +160,6 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
             cfg.train_on_inputs,
             cfg.sequence_len,
         )
-        ds_wrapper = TokenizedPromptDataset(ds_strategy, ds, cfg.dataset_columns if is_streaming else None)
-        return ds_wrapper
     elif d_base_type == "jeopardy":
         ds_strategy = JeopardyPromptTokenizingStrategy(
             JeopardyPrompter(d_prompt_style),
@@ -176,8 +167,6 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
             cfg.train_on_inputs,
             cfg.sequence_len,
         )
-        ds_wrapper = TokenizedPromptDataset(ds_strategy, ds, cfg.dataset_columns if is_streaming else None)
-        return ds_wrapper
     elif d_base_type == "oasst":
         ds_strategy = OpenAssistantPromptTokenizingStrategy(
             AlpacaPrompter(d_prompt_style),
@@ -185,8 +174,6 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
             cfg.train_on_inputs,
             cfg.sequence_len,
         )
-        ds_wrapper = TokenizedPromptDataset(ds_strategy, ds, cfg.dataset_columns if is_streaming else None)
-        return ds_wrapper
     elif d_base_type == "gpteacher":
         ds_strategy = GPTeacherPromptTokenizingStrategy(
             GPTeacherPrompter(d_prompt_style),
@@ -194,8 +181,6 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
             cfg.train_on_inputs,
             cfg.sequence_len,
         )
-        ds_wrapper = TokenizedPromptDataset(ds_strategy, ds, cfg.dataset_columns if is_streaming else None)
-        return ds_wrapper
     elif d_base_type == "reflection":
         ds_strategy = AlpacaReflectionPTStrategy(
             ReflectAlpacaPrompter(d_prompt_style),
@@ -203,8 +188,6 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
             cfg.train_on_inputs,
             cfg.sequence_len,
         )
-        ds_wrapper = TokenizedPromptDataset(ds_strategy, ds, cfg.dataset_columns if is_streaming else None)
-        return ds_wrapper
     else:
         suffix = ""
         if ":load_" in d.type:
@@ -213,6 +196,20 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
         raise ValueError(
             f"unhandled prompt tokenization strategy: {d.type} {suffix}"
         )
+
+    if is_streaming:
+        map_kwargs = {}
+        if ds_strategy.supports_batched:
+            map_kwargs["batched"] = True
+            map_kwargs["batch_size"] = 100
+        return ds.map(
+            ds_strategy.tokenize_prompt,
+            remove_columns=cfg.dataset_columns,
+            **map_kwargs,
+        )
+    else:
+        ds_wrapper = TokenizedPromptDataset(ds_strategy, ds, remove_columns=None)
+        return ds_wrapper
 
 
 def load_tokenized_prepared_datasets_local_stream(
