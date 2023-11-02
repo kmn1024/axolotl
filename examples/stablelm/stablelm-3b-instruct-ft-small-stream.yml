@@ -25,8 +25,8 @@ dataset_prepared_path: /tmp/dataset_prepared_path
 output_dir: ./stablelm-3b-instruct
 
 sequence_len: 4096
-sample_packing: false  # Incompatible with streaming
-pad_to_sequence_len: false  # Incompatible with streaming
+sample_packing: true
+pad_to_sequence_len: true
 
 wandb_project: stablelm-3b-instruct-stream-demo1
 wandb_entity:

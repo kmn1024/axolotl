@@ -113,6 +113,15 @@ def disable_datasets_caching():
         set_caching_enabled(True)
 
 
+def process_streaming_dataset_for_packing(cfg, train_dataset):
+    drop_long = partial(drop_long_seq, sequence_len=cfg.sequence_len)
+    train_dataset = train_dataset.filter(drop_long)
+    train_dataset = train_dataset.map(
+        add_position_ids
+    )
+    return train_dataset
+
+
 def process_datasets_for_packing(cfg, train_dataset, eval_dataset, tokenizer):
     drop_long = partial(drop_long_seq, sequence_len=cfg.sequence_len)
     with zero_first(is_main_process()):

@@ -46,6 +46,7 @@ from axolotl.utils.distributed import is_main_process, zero_first
 from axolotl.utils.trainer import (
     calculate_total_num_steps,
     process_datasets_for_packing,
+    process_streaming_dataset_for_packing,
 )
 
 LOG = logging.getLogger("axolotl")
@@ -222,91 +223,38 @@ def pack_and_pad(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: Dict[
     # Concatenate tokens so that their lengths are less than max_tokens
     new_input_ids = []
     new_attention_mask = []
-    buffer_input_ids = torch.tensor([], dtype=torch.long)
-    buffer_attention_mask = torch.tensor([], dtype=torch.long)
+    buffer_input_ids = torch.full((max_tokens,), tokenizer.pad_token_id, dtype=torch.long)
+    buffer_attention_mask = torch.full((max_tokens,), 0, dtype=torch.long)
+    buffer_len = 0
 
     for ids, mask in zip(input_ids, attention_mask):
         # Drop entries that are too long.
-        if ids.numel() > max_tokens:
+        ids_length = ids.numel()
+        if ids_length > max_tokens:
             LOG.warning(f'pack_and_pad skip long input: {ids.numel()} > {max_tokens}')
             continue
         
-        if buffer_input_ids.numel() == max_tokens:
-            new_input_ids.append(buffer_input_ids)
-            new_attention_mask.append(buffer_attention_mask)
-            buffer_input_ids = torch.tensor([], dtype=torch.long)
-            buffer_attention_mask = torch.tensor([], dtype=torch.long)
-            buffer_input_ids = torch.cat((buffer_input_ids, ids), dim=0)
-            buffer_attention_mask = torch.cat((buffer_attention_mask, mask), dim=0)
-        elif buffer_input_ids.numel() + ids.numel() <= max_tokens:
-            buffer_input_ids = torch.cat((buffer_input_ids, ids), dim=0)
-            buffer_attention_mask = torch.cat((buffer_attention_mask, mask), dim=0)
-        else:
-            buffer_input_ids = torch.cat(
-                (
-                    buffer_input_ids,
-                    torch.full(
-                        (max_tokens - buffer_input_ids.numel(),),
-                        tokenizer.pad_token_id,
-                        dtype=torch.long,
-                    ),
-                ),
-                dim=0,
-            )
-            buffer_attention_mask = torch.cat(
-                (
-                    buffer_attention_mask,
-                    torch.full(
-                        (max_tokens - buffer_attention_mask.numel(),),
-                        0,
-                        dtype=torch.long,
-                    ),
-                ),
-                dim=0,
-            )
-            new_input_ids.append(buffer_input_ids)
-            new_attention_mask.append(buffer_attention_mask)
-            buffer_input_ids = torch.tensor([], dtype=torch.long)
-            buffer_attention_mask = torch.tensor([], dtype=torch.long)
+        if buffer_len == max_tokens or buffer_len + ids_length > max_tokens:
+            new_input_ids.append(buffer_input_ids.clone())
+            new_attention_mask.append(buffer_attention_mask.clone())
+            buffer_input_ids.fill_(tokenizer.pad_token_id)
+            buffer_attention_mask.fill_(0)
+            buffer_len = 0
+        buffer_input_ids[buffer_len:buffer_len + ids_length] = ids
+        buffer_attention_mask[buffer_len:buffer_len + ids_length] = mask
+        buffer_len += ids_length
 
-            buffer_input_ids = torch.cat((buffer_input_ids, ids), dim=0)
-            buffer_attention_mask = torch.cat((buffer_attention_mask, mask), dim=0)
-
-    if buffer_input_ids.numel() > 0:  # for any leftover tokens
-        while buffer_input_ids.numel() < max_tokens:  # make all sequences equal in size
-            buffer_input_ids = torch.cat(
-                (
-                    buffer_input_ids,
-                    torch.full(
-                        (max_tokens - buffer_input_ids.numel(),),
-                        tokenizer.pad_token_id,
-                        dtype=torch.long,
-                    ),
-                ),
-                dim=0,
-            )
-            buffer_attention_mask = torch.cat(
-                (
-                    buffer_attention_mask,
-                    torch.full(
-                        (max_tokens - buffer_attention_mask.numel(),),
-                        0,
-                        dtype=torch.long,
-                    ),
-                ),
-                dim=0,
-            )
-        new_input_ids.append(buffer_input_ids)
-        new_attention_mask.append(buffer_attention_mask)
+    if buffer_len > 0:  # for any leftover tokens
+        new_input_ids.append(buffer_input_ids.clone())
+        new_attention_mask.append(buffer_attention_mask.clone())
 
     ret = {
         "input_ids": [seq.tolist() for seq in new_input_ids],
         "labels": [seq.tolist() for seq in new_input_ids],
         "attention_mask": [seq.tolist() for seq in new_attention_mask],
     }
-
-    LOG.debug(len(ret["input_ids"]))
     return ret
+
 
 def load_tokenized_prepared_datasets_local_stream(
     tokenizer, cfg 
@@ -377,12 +325,13 @@ def load_tokenized_prepared_datasets_local_stream(
     LOG.info("merging datasets")
     dataset = interleave_datasets(datasets, seed=seed, stopping_strategy='all_exhausted')
     dataset = dataset.shuffle(seed=seed, buffer_size=10_000)
-    LOG.info("finalize datasets by packing and padding")
-    finalize_ds = functools.partial(pack_and_pad, tokenizer, cfg.sequence_len)
-    dataset = dataset.map(
-        finalize_ds,
-        batched=True,
-    )
+    LOG.info("finalize datasets")
+    # finalize_ds = functools.partial(pack_and_pad, tokenizer, cfg.sequence_len)
+    # dataset = dataset.map(
+    #     finalize_ds,
+    #     batched=True,
+    # )
+    dataset = process_streaming_dataset_for_packing(cfg, dataset)
     return dataset
 
 
