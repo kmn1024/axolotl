@@ -12,11 +12,11 @@ datasets:
   - path: '/home/ck/Downloads/convo_pygmalion_small/koishi-flan.jsonl'
     name: 'koishi-flan'
     type: pygmalion
-    ds_type: 'jsonl'
+    ds_type: 'json'
   - path: '/home/ck/Downloads/convo_pygmalion_small/koishi-dolly.jsonl'
     name: 'koishi-dolly'
     type: pygmalion
-    ds_type: 'jsonl'
+    ds_type: 'json'
 
 dataset_prepared_path: /tmp/dataset_prepared_path
 val_set_size: 0.05

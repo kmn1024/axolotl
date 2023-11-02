@@ -9,28 +9,13 @@ load_in_4bit: false
 strict: false
 
 datasets:
-  - path: '/home/ck/Downloads/convo_pygmalion_instruct/CoT-Collection.jsonl'
-    name: 'CoT-Collection'
-    type: pygmalion
-    ds_type: 'json'
-  - path: '/home/ck/Downloads/convo_pygmalion_instruct/koishi-dolly.jsonl'
-    name: 'koishi-dolly'
-    type: pygmalion
-    ds_type: 'json'
-  - path: '/home/ck/Downloads/convo_pygmalion_instruct/koishi-flan.jsonl'
+  local_streaming_datasets: True
+  - path: '/home/ck/Downloads/convo_pygmalion_small/koishi-flan.jsonl'
     name: 'koishi-flan'
     type: pygmalion
     ds_type: 'json'
-  - path: '/home/ck/Downloads/convo_pygmalion_instruct/koishi-gpteacher.jsonl'
-    name: 'koishi-gpteacher'
-    type: pygmalion
-    ds_type: 'json'
-  - path: '/home/ck/Downloads/convo_pygmalion_instruct/koishi-hh-rlhf.jsonl'
-    name: 'koishi-hh-rlhf'
-    type: pygmalion
-    ds_type: 'json'
-  - path: '/home/ck/Downloads/convo_pygmalion_instruct/natural-instructions-2.8.jsonl'
-    name: 'natural-instructions'
+  - path: '/home/ck/Downloads/convo_pygmalion_small/koishi-dolly.jsonl'
+    name: 'koishi-dolly'
     type: pygmalion
     ds_type: 'json'
 
@@ -42,7 +27,7 @@ sequence_len: 4096
 sample_packing: true
 pad_to_sequence_len: true
 
-wandb_project: stablelm-3b-instruct-full
+wandb_project: stablelm-3b-instruct-stream-demo1
 wandb_entity:
 wandb_watch:
 wandb_run_id: run1
@@ -50,7 +35,7 @@ wandb_log_model:
 
 gradient_accumulation_steps: 1
 micro_batch_size: 8
-num_epochs: 2
+num_epochs: 4
 optimizer: adamw_torch
 adam_beta1: 0.9
 adam_beta2: 0.95
@@ -74,7 +59,7 @@ logging_steps: 1
 xformers_attention:
 flash_attention: true
 
-warmup_steps: 100
+warmup_steps: 10
 eval_steps: 0.05
 eval_table_size:
 eval_table_max_new_tokens:

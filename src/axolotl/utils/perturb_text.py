@@ -6,6 +6,7 @@ import unicodedata
 
 import numpy as np
 from unidecode import unidecode
+from nltk.corpus import words
 
 def get_words_and_separators(text):
     tokens = nltk.word_tokenize(text)
@@ -70,6 +71,7 @@ class Perturber:
         self.perturb_schedule = list(np.arange(0.12, 0.01, -0.02))
         self.deletion_prob = 0.3
         self.repeat_prob = 0.2
+        self.bad_random_prob = 0.02
 
     def normalize_for_lookup(self, word):
         return unidecode(word.lower())
@@ -95,10 +97,16 @@ class Perturber:
                         separators[idx-1] = ' '
                     pass  # Delete token (and separator)
                 elif perturb_type_dice <= self.deletion_prob + self.repeat_prob:
-                    # Insertion error
+                    # Repetition error
                     new_tokens.append(tokens[idx])
                     new_separators.append(' ')
                     new_tokens.append(tokens[idx][1:] if tokens[idx].startswith('\'') else tokens[idx])
+                    new_separators.append(separators[idx])
+                elif perturb_type_dice <= self.deletion_prob + self.repeat_prob + self.bad_random_prob:
+                    new_tokens.append(tokens[idx])
+                    new_separators.append(' ')
+                    random_word = random.choice(words.words())
+                    new_tokens.append(random_word[1:] if random_word.startswith('\'') else random_word)
                     new_separators.append(separators[idx])
                 else:
                     # Substitution

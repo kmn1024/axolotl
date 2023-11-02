@@ -12,35 +12,35 @@ datasets:
   - path: '/home/ck/Downloads/convo_pygmalion_chat/airboros-3.1.jsonl'
     name: 'airboros'
     type: pygmalion
-    ds_type: 'jsonl'
+    ds_type: 'json'
   - path: '/home/ck/Downloads/convo_pygmalion_chat/dolphin-flan1m-alpaca-uncensored-deduped.jsonl'
     name: 'dolphin-flan1m'
     type: pygmalion
-    ds_type: 'jsonl'
+    ds_type: 'json'
   - path: '/home/ck/Downloads/convo_pygmalion_chat/soda_test.jsonl'
     name: 'soda_test'
     type: pygmalion
-    ds_type: 'jsonl'
+    ds_type: 'json'
   - path: '/home/ck/Downloads/convo_pygmalion_chat/soda_train.jsonl'
     name: 'soda_train'
     type: pygmalion
-    ds_type: 'jsonl'
+    ds_type: 'json'
   - path: '/home/ck/Downloads/convo_pygmalion_chat/soda_validate.jsonl'
     name: 'soda_validate'
     type: pygmalion
-    ds_type: 'jsonl'
+    ds_type: 'json'
   - path: '/home/ck/Downloads/convo_pygmalion_chat/ultrachat.jsonl'
     name: 'ultrachat'
     type: pygmalion
-    ds_type: 'jsonl'
+    ds_type: 'json'
   - path: '/home/ck/Downloads/convo_pygmalion_chat/gpt_roleplay_realm-en.jsonl'
     name: 'gpt_roleplay_realm'
     type: pygmalion
-    ds_type: 'jsonl'
+    ds_type: 'json'
   - path: '/home/ck/Downloads/convo_pygmalion_chat/samantha-1.1.jsonl'
     name: 'samantha'
     type: pygmalion
-    ds_type: 'jsonl'
+    ds_type: 'json'
 
 dataset_prepared_path: /tmp/dataset_prepared_path
 val_set_size: 0.05
