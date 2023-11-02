@@ -13,12 +13,13 @@ def get_words_and_separators(text):
     tokens = nltk.word_tokenize(text)
     separators = []
     start = 0
-    for token in tokens[1:]:
+    for token in tokens:
         # Find the position of the next token in the string, starting from 'start'
         pos = text.find(token, start)
         # Extract the separator: the part of the string before this token
-        separator = text[start:pos]
-        separators.append(separator)
+        if start != 0:
+            separator = text[start:pos]
+            separators.append(separator)
         # Update 'start' to the end of the token
         start = pos + len(token)
     # Add the trailing separator, if any
@@ -131,5 +132,5 @@ class Perturber:
 
         output = [new_tokens[idx] + new_separators[idx] for idx in range(len(tokens) - 1)]
         output_str = ''.join(output) + new_tokens[-1]
-        print(f'{text} -> {output_str}')
+        print(f'Perturbed: {text} -> {output_str}')
         return output_str

@@ -10,7 +10,7 @@ strict: false
 
 local_streaming_datasets: True
 dataset_columns:
-  - 'text'
+  - 'conversations'
 datasets:
   - path: '/home/ck/Downloads/convo_pygmalion_small/koishi-flan.jsonl'
     name: 'koishi-flan'
@@ -22,7 +22,6 @@ datasets:
     ds_type: 'json'
 
 dataset_prepared_path: /tmp/dataset_prepared_path
-val_set_size: 0.05
 output_dir: ./stablelm-3b-instruct
 
 sequence_len: 4096
@@ -36,8 +35,7 @@ wandb_run_id: run1
 wandb_log_model:
 
 gradient_accumulation_steps: 1
-micro_batch_size: 8
-num_epochs: 4
+micro_batch_size: 256
 optimizer: adamw_torch
 adam_beta1: 0.9
 adam_beta2: 0.95
@@ -57,15 +55,17 @@ gradient_checkpointing: true
 early_stopping_patience:
 resume_from_checkpoint:
 local_rank:
-logging_steps: 1
 xformers_attention:
 flash_attention: true
 
-warmup_steps: 10
-eval_steps: 0.05
+max_steps: 434  # epochs * Num data rows / (GPUs * micro_batch_size) = 4 * 55552 / (2*256)
+logging_steps: 1  # max_steps * 0.002
+warmup_steps: 10  # max_steps * 0.02
+save_steps: 0.25  # 1 / epochs
+
+eval_steps:
 eval_table_size:
 eval_table_max_new_tokens:
-save_steps:
 debug:
 deepspeed: deepspeed/zero2.json
 fsdp:

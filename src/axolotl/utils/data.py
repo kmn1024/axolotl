@@ -75,6 +75,9 @@ def prepare_dataset(cfg, tokenizer):
         train_dataset = train_dataset.with_format("torch")
         eval_dataset = None
         return train_dataset, eval_dataset, cfg.max_steps
+    
+    if cfg.local_streaming_datasets:
+        return train_dataset, eval_dataset, cfg.max_steps
 
     with zero_first(is_main_process()):
         train_dataset, eval_dataset = process_datasets_for_packing(
@@ -580,7 +583,6 @@ def load_prepare_datasets(
             index=cfg.dataset_shard_idx,
         )
 
-    LOG.info(f"total size: {dataset.num_rows}")
     if cfg.val_set_size:
         # ensure we end up with the same fingerprint by doing rank0 first and being able to cache
         to_hash_train = (
