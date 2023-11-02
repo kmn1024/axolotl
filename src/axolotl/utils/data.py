@@ -215,6 +215,94 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
         return ds_wrapper
 
 
+def pack_and_pad(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: Dict[str, List[int]]):
+    input_ids = [torch.tensor(seq) for seq in res["input_ids"]]
+    attention_mask = [torch.tensor(seq) for seq in res["attention_mask"]]
+
+    # Concatenate tokens so that their lengths are less than max_tokens
+    new_input_ids = []
+    new_attention_mask = []
+    buffer_input_ids = torch.tensor([], dtype=torch.long)
+    buffer_attention_mask = torch.tensor([], dtype=torch.long)
+
+    for ids, mask in zip(input_ids, attention_mask):
+        if buffer_input_ids.numel() == max_tokens:
+            new_input_ids.append(buffer_input_ids)
+            new_attention_mask.append(buffer_attention_mask)
+            buffer_input_ids = torch.tensor([], dtype=torch.long)
+            buffer_attention_mask = torch.tensor([], dtype=torch.long)
+            buffer_input_ids = torch.cat((buffer_input_ids, ids), dim=0)
+            buffer_attention_mask = torch.cat((buffer_attention_mask, mask), dim=0)
+        elif buffer_input_ids.numel() + ids.numel() <= max_tokens:
+            buffer_input_ids = torch.cat((buffer_input_ids, ids), dim=0)
+            buffer_attention_mask = torch.cat((buffer_attention_mask, mask), dim=0)
+        else:
+            buffer_input_ids = torch.cat(
+                (
+                    buffer_input_ids,
+                    torch.full(
+                        (max_tokens - buffer_input_ids.numel(),),
+                        tokenizer.pad_token_id,
+                        dtype=torch.long,
+                    ),
+                ),
+                dim=0,
+            )
+            buffer_attention_mask = torch.cat(
+                (
+                    buffer_attention_mask,
+                    torch.full(
+                        (max_tokens - buffer_attention_mask.numel(),),
+                        0,
+                        dtype=torch.long,
+                    ),
+                ),
+                dim=0,
+            )
+            new_input_ids.append(buffer_input_ids)
+            new_attention_mask.append(buffer_attention_mask)
+            buffer_input_ids = torch.tensor([], dtype=torch.long)
+            buffer_attention_mask = torch.tensor([], dtype=torch.long)
+
+            buffer_input_ids = torch.cat((buffer_input_ids, ids), dim=0)
+            buffer_attention_mask = torch.cat((buffer_attention_mask, mask), dim=0)
+
+    if buffer_input_ids.numel() > 0:  # for any leftover tokens
+        while buffer_input_ids.numel() < max_tokens:  # make all sequences equal in size
+            buffer_input_ids = torch.cat(
+                (
+                    buffer_input_ids,
+                    torch.full(
+                        (max_tokens - buffer_input_ids.numel(),),
+                        tokenizer.pad_token_id,
+                        dtype=torch.long,
+                    ),
+                ),
+                dim=0,
+            )
+            buffer_attention_mask = torch.cat(
+                (
+                    buffer_attention_mask,
+                    torch.full(
+                        (max_tokens - buffer_attention_mask.numel(),),
+                        0,
+                        dtype=torch.long,
+                    ),
+                ),
+                dim=0,
+            )
+        new_input_ids.append(buffer_input_ids)
+        new_attention_mask.append(buffer_attention_mask)
+
+    ret = {
+        "input_ids": [seq.tolist() for seq in new_input_ids],
+        "labels": [seq.tolist() for seq in new_input_ids],
+        "attention_mask": [seq.tolist() for seq in new_attention_mask],
+    }
+
+    LOG.debug(len(ret["input_ids"]))
+    return ret
+
 def load_tokenized_prepared_datasets_local_stream(
     tokenizer, cfg 
 ) -> DatasetDict:
@@ -283,9 +371,13 @@ def load_tokenized_prepared_datasets_local_stream(
 
     LOG.info("merging datasets")
     dataset = interleave_datasets(datasets, seed=seed, stopping_strategy='all_exhausted')
-    if len(datasets) > 1:
-        LOG.info("shuffle merged datasets")
-        dataset = dataset.shuffle(seed=seed)
+    dataset = dataset.shuffle(seed=seed, buffer_size=10_000)
+    LOG.info("finalize datasets by packing and padding")
+    finalize_ds = functools.partial(pack_and_pad, tokenizer, cfg.sequence_len)
+    dataset = dataset.map(
+        finalize_ds,
+        batched=True,
+    )
     return dataset
 
 
