@@ -25,8 +25,8 @@ dataset_prepared_path: /tmp/dataset_prepared_path
 output_dir: ./stablelm-3b-instruct
 
 sequence_len: 4096
-sample_packing: true
-pad_to_sequence_len: true
+sample_packing: false  # Incompatible with streaming
+pad_to_sequence_len: false  # Incompatible with streaming
 
 wandb_project: stablelm-3b-instruct-stream-demo1
 wandb_entity:
@@ -58,12 +58,12 @@ local_rank:
 xformers_attention:
 flash_attention: true
 
-max_steps: 434  # epochs * Num data rows / (GPUs * micro_batch_size) = 4 * 55552 / (2*256)
+max_steps: 434  # Must for streaming. epochs * Num data rows / (GPUs * micro_batch_size) = 4 * 55552 / (2*256)
 logging_steps: 1  # max_steps * 0.002
 warmup_steps: 10  # max_steps * 0.02
 save_steps: 0.25  # 1 / epochs
 
-eval_steps:
+eval_steps:  # No split for streaming.
 eval_table_size:
 eval_table_max_new_tokens:
 debug:

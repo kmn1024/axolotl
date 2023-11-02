@@ -5,6 +5,7 @@ import logging
 import random
 from collections import defaultdict
 from typing import Generator, List, Tuple
+from axolotl.utils.perturb_text import Perturber
 
 from axolotl.prompt_tokenizers import (
     PromptTokenizingStrategy,
@@ -27,7 +28,8 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
     def __init__(self, prompter, tokenizer, *args, **kwargs):
         super().__init__(prompter, tokenizer, *args, **kwargs)
         res = self._tokenize("<|model|>", add_eos_token=False, strip_bos_token=True)
-        self.bot_prefix_token_ids = res["input_ids"]      
+        self.bot_prefix_token_ids = res["input_ids"]
+        self.perturber = Perturber.instance()
 
     def tokenize_prompt(self, prompt):
         result, current_len = tokenize_prompt_default()

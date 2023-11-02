@@ -5,6 +5,7 @@ from collections import defaultdict
 from typing import Any, Dict, Generator, Optional, Tuple
 
 from axolotl.prompt_tokenizers import InstructionPromptTokenizingStrategy
+from axolotl.utils.perturb_text import Perturber
 
 
 class CompletionPromptTokenizingStrategy(InstructionPromptTokenizingStrategy):
@@ -18,6 +19,7 @@ class CompletionPromptTokenizingStrategy(InstructionPromptTokenizingStrategy):
         super().__init__(*args, **kwargs)
         if max_length is not None:
             self.max_length = max_length
+        self.perturber = Perturber.instance()
 
     @property
     def supports_batched(self):

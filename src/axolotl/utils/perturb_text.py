@@ -63,6 +63,14 @@ def is_newline(s):
 HOMOPHONE_FILE = './src/axolotl/utils/filtered_dist_homophones.tar.gz'
 
 class Perturber:
+    _instance = None
+
+    @classmethod
+    def instance(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = cls(*args, **kwargs)
+        return cls._instance
+
     def __init__(self):
         print('Creating Perturber')
         self.homophones = {}
@@ -85,8 +93,6 @@ class Perturber:
         perturb_idx = 0
         for idx in range(len(tokens)):
             if is_punctuation(tokens[idx]):
-                new_tokens.append(tokens[idx])
-                new_separators.append(separators[idx])
                 perturb = False
             else:
                 perturb_prob = self.perturb_schedule[perturb_idx] if perturb_idx < len(self.perturb_schedule) else self.perturb_schedule[-1]
@@ -130,7 +136,8 @@ class Perturber:
             if is_punctuation(tokens[idx]) and is_newline(separators[idx]) and perturb_idx >= MIN_WORDS_PER_SENTENCE:
                 perturb_idx = 0
 
-        output = [new_tokens[idx] + new_separators[idx] for idx in range(len(tokens) - 1)]
+        assert len(new_tokens) == len(new_separators)
+        output = [new_tokens[idx] + new_separators[idx] for idx in range(len(new_tokens) - 1)]
         output_str = ''.join(output) + new_tokens[-1]
         print(f'Perturbed: {text} -> {output_str}')
         return output_str
