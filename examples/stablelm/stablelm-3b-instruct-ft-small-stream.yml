@@ -9,6 +9,8 @@ load_in_4bit: false
 strict: false
 
 local_streaming_datasets: True
+dataset_columns:
+  - 'text'
 datasets:
   - path: '/home/ck/Downloads/convo_pygmalion_small/koishi-flan.jsonl'
     name: 'koishi-flan'

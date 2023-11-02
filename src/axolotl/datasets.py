@@ -2,7 +2,7 @@
 
 import logging
 import os
-from typing import List
+from typing import List, Optional
 
 import torch
 from datasets import Dataset, IterableDataset
@@ -30,13 +30,15 @@ class TokenizedPromptDataset(Dataset):
         self,
         prompt_tokenizer: PromptTokenizingStrategy,
         dataset: IterableDataset,
+        remove_columns: Optional[List[str]] = None,
         **kwargs,
     ):
         self.prompt_tokenizer = prompt_tokenizer
+        self.remove_columns = remove_columns
         super().__init__(self.process(dataset).data, **kwargs)
 
     def process(self, dataset):
-        features = dataset.features.keys()
+        features = self.remove_columns if self.remove_columns else dataset.features.keys()
         num_proc = min(64, os.cpu_count())
         map_kwargs = {}
         if self.prompt_tokenizer.supports_batched:
