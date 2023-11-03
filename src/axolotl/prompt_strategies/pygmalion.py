@@ -120,15 +120,12 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
             return result
         
         # Else, need to chunk into multiple examples.
-        OVERLAP = 0.5 * self.sequence_len
+        OVERLAP = int(0.5 * self.sequence_len)
         chunked_result, _ = tokenize_prompt_default()
         for key, val in result.items():
             for i in range(0, len(val), OVERLAP):
                 chunked_result[key].append(val[i : i + self.sequence_len])
         return chunked_result
-        
-        
-        return result
 
 
 class PygmalionPrompter:

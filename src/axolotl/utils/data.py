@@ -216,17 +216,24 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
 
 
 def pack_and_pad(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: Dict[str, List[int]]):
-    input_ids = [torch.tensor(seq) for seq in res["input_ids"]]
-    attention_mask = [torch.tensor(seq) for seq in res["attention_mask"]]
+    def to_tensor_list(input):
+        return [torch.tensor(subseq) for seq in input for subseq in (seq if isinstance(seq[0], list) else [seq])]
+
+    IGNORE_TOKEN_ID = -100  # Copied from prompt_strategies
+    input_ids = to_tensor_list(res["input_ids"])
+    labels = to_tensor_list(res["labels"])
+    attention_mask = to_tensor_list(res["attention_mask"])
 
     # Concatenate tokens so that their lengths are less than max_tokens
     new_input_ids = []
+    new_labels = []
     new_attention_mask = []
     buffer_input_ids = torch.full((max_tokens,), tokenizer.pad_token_id, dtype=torch.long)
+    buffer_labels = torch.full((max_tokens,), IGNORE_TOKEN_ID, dtype=torch.long)
     buffer_attention_mask = torch.full((max_tokens,), 0, dtype=torch.long)
     buffer_len = 0
 
-    for ids, mask in zip(input_ids, attention_mask):
+    for ids, label, mask in zip(input_ids, labels, attention_mask):
         # Drop entries that are too long.
         ids_length = ids.numel()
         if ids_length > max_tokens:
@@ -235,21 +242,25 @@ def pack_and_pad(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: Dict[
         
         if buffer_len == max_tokens or buffer_len + ids_length > max_tokens:
             new_input_ids.append(buffer_input_ids.clone())
+            new_labels.append(buffer_labels.clone())
             new_attention_mask.append(buffer_attention_mask.clone())
             buffer_input_ids.fill_(tokenizer.pad_token_id)
+            buffer_labels.fill_(IGNORE_TOKEN_ID)
             buffer_attention_mask.fill_(0)
             buffer_len = 0
         buffer_input_ids[buffer_len:buffer_len + ids_length] = ids
+        buffer_labels[buffer_len:buffer_len + ids_length] = label
         buffer_attention_mask[buffer_len:buffer_len + ids_length] = mask
         buffer_len += ids_length
 
     if buffer_len > 0:  # for any leftover tokens
         new_input_ids.append(buffer_input_ids.clone())
+        new_labels.append(buffer_labels.clone())
         new_attention_mask.append(buffer_attention_mask.clone())
 
     ret = {
         "input_ids": [seq.tolist() for seq in new_input_ids],
-        "labels": [seq.tolist() for seq in new_input_ids],
+        "labels": [seq.tolist() for seq in new_labels],
         "attention_mask": [seq.tolist() for seq in new_attention_mask],
     }
     return ret
