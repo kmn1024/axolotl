@@ -217,7 +217,16 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
 
 def pack_and_pad(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: Dict[str, List[int]]):
     def to_tensor_list(input):
-        return [torch.tensor(subseq) for seq in input for subseq in (seq if isinstance(seq[0], list) else [seq])]
+        output = []
+        for seq in input:
+            assert isinstance(seq, list), f'Unsupported input: {seq}'
+            if isinstance(seq[0], int):
+                output.append(torch.tensor(seq))
+            elif isinstance(seq[0], list):
+                output += to_tensor_list(seq)
+            else:
+                assert False, f'Unsupported sub-input: {seq[0]}'
+        return output
 
     IGNORE_TOKEN_ID = -100  # Copied from prompt_strategies
     input_ids = to_tensor_list(res["input_ids"])
