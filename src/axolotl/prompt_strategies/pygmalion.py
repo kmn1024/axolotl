@@ -116,15 +116,16 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
             else:
                 assert False, f"unknown role in conversation: {role}"
         
-        if current_len <= self.sequence_len:
-            return result
-        
-        # Else, need to chunk into multiple examples.
         OVERLAP = int(0.5 * self.sequence_len)
         chunked_result, _ = tokenize_prompt_default()
-        for key, val in result.items():
-            for i in range(0, len(val), OVERLAP):
-                chunked_result[key].append(val[i : i + self.sequence_len])
+        if current_len <= self.sequence_len:
+            for key, val in result.items():
+                chunked_result[key].append(val)
+        else:        
+            # Else, need to chunk into multiple examples.
+            for key, val in result.items():
+                for i in range(0, len(val), OVERLAP):
+                    chunked_result[key].append(val[i : i + self.sequence_len])
         return chunked_result
 
 

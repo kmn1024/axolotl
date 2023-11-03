@@ -31,11 +31,11 @@ pad_to_sequence_len: false
 wandb_project: stablelm-3b-instruct-stream-demo1
 wandb_entity:
 wandb_watch:
-wandb_run_id: run1
+wandb_run_id: run7
 wandb_log_model:
 
-gradient_accumulation_steps: 1
-micro_batch_size: 8
+gradient_accumulation_steps: 4
+micro_batch_size: 2
 optimizer: adamw_torch
 adam_beta1: 0.9
 adam_beta2: 0.95
@@ -59,9 +59,9 @@ xformers_attention:
 flash_attention: true
 
 load_best_model_at_end: False
-max_steps: 356  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * GPUs).
-logging_steps: 1  # max_steps * 0.002
-warmup_steps: 10  # max_steps * 0.02
+max_steps: 1430  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * GPUs).
+logging_steps: 4  # max_steps * 0.002
+warmup_steps: 40  # max_steps * 0.02
 save_steps: 0.25  # 1 / epochs
 
 eval_steps:  # No split for streaming.
