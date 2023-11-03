@@ -46,7 +46,6 @@ from axolotl.utils.distributed import is_main_process, zero_first
 from axolotl.utils.trainer import (
     calculate_total_num_steps,
     process_datasets_for_packing,
-    process_streaming_dataset_for_packing,
 )
 
 LOG = logging.getLogger("axolotl")
@@ -326,12 +325,11 @@ def load_tokenized_prepared_datasets_local_stream(
     dataset = interleave_datasets(datasets, seed=seed, stopping_strategy='all_exhausted')
     dataset = dataset.shuffle(seed=seed, buffer_size=10_000)
     LOG.info("finalize datasets")
-    # finalize_ds = functools.partial(pack_and_pad, tokenizer, cfg.sequence_len)
-    # dataset = dataset.map(
-    #     finalize_ds,
-    #     batched=True,
-    # )
-    dataset = process_streaming_dataset_for_packing(cfg, dataset)
+    finalize_ds = functools.partial(pack_and_pad, tokenizer, cfg.sequence_len)
+    dataset = dataset.map(
+        finalize_ds,
+        batched=True,
+    )
     return dataset
 
 

@@ -17,6 +17,7 @@ from typing import Optional, Union
 import torch
 import transformers
 from datasets import Dataset
+from datasets.distributed import split_dataset_by_node
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler, SequentialSampler
 from transformers import EarlyStoppingCallback, Trainer, TrainingArguments
@@ -184,6 +185,10 @@ class AxolotlTrainer(Trainer):
                     device_count=int(os.environ.get("WORLD_SIZE", 1)),
                 )
             )
+        elif self.args.world_size > 1:
+            self.train_dataset = split_dataset_by_node(self.train_dataset,
+                                                       rank=self.args.process_index,
+                                                       world_size=self.args.world_size)
         return super().get_train_dataloader()
 
     def get_eval_dataloader(
@@ -207,6 +212,10 @@ class AxolotlTrainer(Trainer):
                     device_count=int(os.environ.get("WORLD_SIZE", 1)),
                 )
             )
+        elif self.args.world_size > 1:
+            eval_dataset = split_dataset_by_node(eval_dataset,
+                                                 rank=self.args.process_index,
+                                                 world_size=self.args.world_size)
         return super().get_eval_dataloader(eval_dataset)
 
     def _get_bench_sampler(

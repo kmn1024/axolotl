@@ -37,7 +37,6 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
         system_res, system_labels = None, None
         prev_message_is_system = False
     
-        started_dialogue = False
         while (next_item := next(conversations, None)) is not None:
             role, message = next_item
             if role == "system":
@@ -100,28 +99,35 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
                     *copy.deepcopy(bot_res["input_ids"])
                 ][len(self.bot_prefix_token_ids) :]
 
-                incremental_len = len(user_res["input_ids"]) + len(bot_res["input_ids"])
-                if not started_dialogue or current_len + incremental_len < self.sequence_len:
-                    started_dialogue = True
-                    result, current_len = parse_tokenized_to_result(
-                        result,
-                        current_len,
-                        user_res,
-                        user_labels,
-                        pad_token_id=self.tokenizer.pad_token_id,
-                    )
-                    result, current_len = parse_tokenized_to_result(
-                        result,
-                        current_len,
-                        bot_res,
-                        bot_labels,
-                        pad_token_id=self.tokenizer.pad_token_id,
-                    )
-                else:
-                    LOG.warning(f"Pygmalion truncate dialogue!")
-                    break
+                result, current_len = parse_tokenized_to_result(
+                    result,
+                    current_len,
+                    user_res,
+                    user_labels,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                )
+                result, current_len = parse_tokenized_to_result(
+                    result,
+                    current_len,
+                    bot_res,
+                    bot_labels,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                )
             else:
                 assert False, f"unknown role in conversation: {role}"
+        
+        if current_len <= self.sequence_len:
+            return result
+        
+        # Else, need to chunk into multiple examples.
+        OVERLAP = 0.5 * self.sequence_len
+        chunked_result, _ = tokenize_prompt_default()
+        for key, val in result.items():
+            for i in range(0, len(val), OVERLAP):
+                chunked_result[key].append(val[i : i + self.sequence_len])
+        return chunked_result
+        
+        
         return result
 
 
