@@ -30,8 +30,9 @@ wandb_watch:
 wandb_run_id: run1
 wandb_log_model:
 
+dataloader_num_workers: 4
 gradient_accumulation_steps: 2
-micro_batch_size: 4
+micro_batch_size: 6
 optimizer: adamw_torch
 adam_beta1: 0.9
 adam_beta2: 0.95

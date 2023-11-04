@@ -56,6 +56,7 @@ wandb_watch:
 wandb_run_id: run1
 wandb_log_model:
 
+dataloader_num_workers: 4
 gradient_accumulation_steps: 1
 micro_batch_size: 8
 num_epochs: 2

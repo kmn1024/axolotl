@@ -31,10 +31,11 @@ pad_to_sequence_len: false
 wandb_project: stablelm-3b-instruct-stream-demo1
 wandb_entity:
 wandb_watch:
-wandb_run_id: a100-run1
+wandb_run_id: a100-run3-numw4
 wandb_log_model:
 
-gradient_accumulation_steps: 2
+dataloader_num_workers: 4
+gradient_accumulation_steps: 1
 micro_batch_size: 6
 optimizer: adamw_torch
 adam_beta1: 0.9
