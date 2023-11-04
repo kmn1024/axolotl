@@ -137,6 +137,8 @@ class Perturber:
                 perturb_idx = 0
 
         assert len(new_tokens) == len(new_separators)
+        if len(new_tokens) == 0:
+            return text  # Fallback
         output = [new_tokens[idx] + new_separators[idx] for idx in range(len(new_tokens) - 1)]
         output_str = ''.join(output) + new_tokens[-1]
         #print(f'Perturbed: {text} -> {output_str}')
