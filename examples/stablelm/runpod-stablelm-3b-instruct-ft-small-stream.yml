@@ -31,7 +31,7 @@ pad_to_sequence_len: false
 wandb_project: stablelm-3b-instruct-stream-demo1
 wandb_entity:
 wandb_watch:
-wandb_run_id: run7
+wandb_run_id: a100-run1
 wandb_log_model:
 
 gradient_accumulation_steps: 1
