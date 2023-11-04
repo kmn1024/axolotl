@@ -34,8 +34,8 @@ wandb_watch:
 wandb_run_id: a100-run1
 wandb_log_model:
 
-gradient_accumulation_steps: 1
-micro_batch_size: 8
+gradient_accumulation_steps: 2
+micro_batch_size: 6
 optimizer: adamw_torch
 adam_beta1: 0.9
 adam_beta2: 0.95
@@ -58,9 +58,9 @@ local_rank:
 xformers_attention:
 flash_attention: true
 
-max_steps: 360  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * GPUs) = 5847355 / (4096*2*2)
-logging_steps: 1  # max_steps * 0.002
-warmup_steps: 10  # max_steps * 0.02
+max_steps: 720  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * GPUs) = 5847355 / (4096*2*2)
+logging_steps: 2  # max_steps * 0.002
+warmup_steps: 20  # max_steps * 0.02
 save_steps: 0.25  # 1 / epochs
 
 val_set_size: 0
