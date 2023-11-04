@@ -58,7 +58,6 @@ local_rank:
 xformers_attention:
 flash_attention: true
 
-load_best_model_at_end: False
 max_steps: 1430  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * GPUs) = 5847355 / (4096*2*2)
 logging_steps: 4  # max_steps * 0.002
 warmup_steps: 40  # max_steps * 0.02

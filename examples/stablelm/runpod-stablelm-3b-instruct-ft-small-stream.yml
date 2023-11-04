@@ -10,28 +10,32 @@ strict: false
 
 local_streaming_datasets: True
 dataset_columns:
-  - 'text'
+  - 'conversations'
 datasets:
-  - path: '/workspace/home/ck/Downloads/mini_256_jsonl/'
-    name: 'mini_256_jsonl'
-    type: completion
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_small/koishi-flan.jsonl'
+    name: 'koishi-flan'
+    type: pygmalion
+    ds_type: 'json'
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_small/koishi-dolly.jsonl'
+    name: 'koishi-dolly'
+    type: pygmalion
     ds_type: 'json'
 
 dataset_prepared_path: /workspace/dataset_prepared_path
-output_dir: /workspace/stablelm-3b-pretrain
+output_dir: /workspace/stablelm-3b-instruct
 
 sequence_len: 4096
 sample_packing: false
 pad_to_sequence_len: false
 
-wandb_project: stablelm-3b-pretrain-demo1
+wandb_project: stablelm-3b-instruct-stream-demo1
 wandb_entity:
 wandb_watch:
-wandb_run_id: run1
+wandb_run_id: run7
 wandb_log_model:
 
-gradient_accumulation_steps: 2
-micro_batch_size: 4
+gradient_accumulation_steps: 1
+micro_batch_size: 8
 optimizer: adamw_torch
 adam_beta1: 0.9
 adam_beta2: 0.95
@@ -54,9 +58,9 @@ local_rank:
 xformers_attention:
 flash_attention: true
 
-max_steps: 2352  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * GPUs) = 77070336 / (4096*4*2)
-logging_steps: 10  # max_steps * 0.002
-warmup_steps: 100  # max_steps * 0.02
+max_steps: 360  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * GPUs) = 5847355 / (4096*2*2)
+logging_steps: 1  # max_steps * 0.002
+warmup_steps: 10  # max_steps * 0.02
 save_steps: 0.25  # 1 / epochs
 
 val_set_size: 0
