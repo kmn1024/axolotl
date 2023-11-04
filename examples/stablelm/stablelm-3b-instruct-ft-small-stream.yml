@@ -64,6 +64,7 @@ logging_steps: 4  # max_steps * 0.002
 warmup_steps: 40  # max_steps * 0.02
 save_steps: 0.25  # 1 / epochs
 
+val_set_size: 0
 eval_steps:  # No split for streaming.
 eval_table_size:
 eval_table_max_new_tokens:
