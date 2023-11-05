@@ -280,9 +280,9 @@ def pack_and_pad(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: Dict[
 
 
 def load_tokenized_prepared_datasets_local_stream(
-    tokenizer, cfg, datasets, is_eval 
+    tokenizer, cfg, dataset_configs, is_eval 
 ) -> DatasetDict:
-    LOG.info("Loading local streaming datasets...")
+    LOG.info(f"Loading local streaming datasets... {dataset_configs}")
     if cfg.seed:
         seed = cfg.seed
     else:
@@ -320,7 +320,7 @@ def load_tokenized_prepared_datasets_local_stream(
         )
 
     # pylint: disable=invalid-name
-    for d in for_d_in_datasets(datasets):
+    for d in for_d_in_datasets(dataset_configs):
         # prefer local dataset, even if hub exists
         local_path = Path(d.path)
         if local_path.exists():
