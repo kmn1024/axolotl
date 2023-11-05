@@ -157,11 +157,7 @@ class AxolotlTrainer(Trainer):
     def _get_eval_sampler(
         self, eval_dataset: Dataset
     ) -> Optional[torch.utils.data.Sampler]:
-        if (
-            self.args.world_size > 1
-            and self.args.sample_packing
-            and self.args.eval_sample_packing is not False
-        ):
+        if self.args.world_size > 1:
             return SequentialDistributedSampler(
                 eval_dataset,
                 num_replicas=self.args.world_size,
@@ -212,10 +208,6 @@ class AxolotlTrainer(Trainer):
                     device_count=int(os.environ.get("WORLD_SIZE", 1)),
                 )
             )
-        elif self.args.world_size > 1:
-            eval_dataset = split_dataset_by_node(eval_dataset,
-                                                 rank=self.args.process_index,
-                                                 world_size=self.args.world_size)
         return super().get_eval_dataloader(eval_dataset)
 
     def _get_bench_sampler(
