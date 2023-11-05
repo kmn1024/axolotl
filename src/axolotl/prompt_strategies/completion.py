@@ -23,7 +23,7 @@ class CompletionPromptTokenizingStrategy(InstructionPromptTokenizingStrategy):
 
     @property
     def supports_batched(self):
-        return True
+        return False
 
     @property
     def field(self) -> str:
@@ -41,25 +41,13 @@ class CompletionPromptTokenizingStrategy(InstructionPromptTokenizingStrategy):
         )
 
     def tokenize_prompt(self, prompt):
-        res = defaultdict(lambda: [])
-        feature_names = list(prompt.keys())
-        for row in zip(*prompt.values()):
-            prompt_row = dict(zip(feature_names, row))
-            (
-                instruction,
-                _,
-                _,
-            ) = self.parse_instruction_fields(prompt_row)
-
-            instruction = self.perturber.perturb_text(instruction)
-            full_prompt = self._build_full_prompt(instruction, None, None)
-            tokenized_full_prompt = self._tokenize(full_prompt)
-
-            for key, val in tokenized_full_prompt.items():
-                for i in range(0, len(val), self.sequence_len):
-                    res[key].append(val[i : i + self.sequence_len])
-
-        return dict(res)
+        text_field = prompt[self._field]
+        text_field = self.perturber.perturb_text(text_field)
+        tokenized_full_prompt = self._tokenize(text_field)
+        res = {}
+        for key, val in tokenized_full_prompt.items():
+            res[key] = [val[i : i + self.sequence_len] for i in range(0, len(val), self.sequence_len)]
+        return res
 
     def _build_full_prompt(
         self, instruction, input, response
