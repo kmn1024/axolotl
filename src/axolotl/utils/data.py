@@ -59,7 +59,14 @@ def md5(to_hash: str, encoding: str = "utf-8") -> str:
 
 
 def prepare_dataset(cfg, tokenizer):
-    if not cfg.pretraining_dataset:
+    if cfg.local_streaming_datasets:
+        with zero_first(is_main_process()):
+            train_dataset = load_tokenized_prepared_datasets_local_stream(tokenizer, cfg, cfg.datasets, is_eval=False)
+            eval_dataset = load_tokenized_prepared_datasets_local_stream(tokenizer, cfg, cfg.eval_datasets, is_eval=True) if cfg.eval_datasets else None
+            if eval_dataset:
+                print(f'Eval examples: {len(eval_dataset)}')
+        return train_dataset, eval_dataset, cfg.max_steps
+    elif not cfg.pretraining_dataset:
         with zero_first(is_main_process()):
             train_dataset, eval_dataset = load_prepare_datasets(
                 tokenizer, cfg, DEFAULT_DATASET_PREPARED_PATH
@@ -74,10 +81,7 @@ def prepare_dataset(cfg, tokenizer):
         # https://discuss.huggingface.co/t/how-to-use-huggingface-trainer-streaming-datasets-without-wrapping-it-with-torchdatas-iterablewrapper/25230
         train_dataset = train_dataset.with_format("torch")
         eval_dataset = None
-        return train_dataset, eval_dataset, cfg.max_steps
-    
-    if cfg.local_streaming_datasets:
-        return train_dataset, eval_dataset, cfg.max_steps
+        return train_dataset, eval_dataset, cfg.max_steps        
 
     with zero_first(is_main_process()):
         train_dataset, eval_dataset = process_datasets_for_packing(
@@ -276,7 +280,7 @@ def pack_and_pad(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: Dict[
 
 
 def load_tokenized_prepared_datasets_local_stream(
-    tokenizer, cfg 
+    tokenizer, cfg, datasets, is_eval 
 ) -> DatasetDict:
     LOG.info("Loading local streaming datasets...")
     if cfg.seed:
@@ -311,12 +315,12 @@ def load_tokenized_prepared_datasets_local_stream(
             ds_type,
             name=ds_name,
             data_files=ds_fullpath,
-            streaming=True,
+            streaming=False if is_eval else True,
             split=None,
         )
 
     # pylint: disable=invalid-name
-    for d in for_d_in_datasets(cfg.datasets):
+    for d in for_d_in_datasets(datasets):
         # prefer local dataset, even if hub exists
         local_path = Path(d.path)
         if local_path.exists():
@@ -343,7 +347,8 @@ def load_tokenized_prepared_datasets_local_stream(
 
     LOG.info("merging datasets")
     dataset = interleave_datasets(datasets, seed=seed, stopping_strategy='all_exhausted')
-    dataset = dataset.shuffle(seed=seed, buffer_size=10_000)
+    if not is_eval:
+        dataset = dataset.shuffle(seed=seed, buffer_size=10_000)
     LOG.info("finalize datasets")
     finalize_ds = functools.partial(pack_and_pad, tokenizer, cfg.sequence_len)
     dataset = dataset.map(
@@ -356,8 +361,6 @@ def load_tokenized_prepared_datasets_local_stream(
 def load_tokenized_prepared_datasets(
     tokenizer, cfg, default_dataset_prepared_path
 ) -> DatasetDict:
-    if cfg.local_streaming_datasets:
-        return load_tokenized_prepared_datasets_local_stream(tokenizer, cfg)
     tokenizer_name = tokenizer.__class__.__name__
     ds_hash = str(
         md5(

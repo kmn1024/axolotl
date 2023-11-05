@@ -20,6 +20,15 @@ datasets:
     name: 'koishi-dolly'
     type: pygmalion
     ds_type: 'json'
+eval_datasets:
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_small_eval/koishi-flan.jsonl'
+    name: 'koishi-flan'
+    type: pygmalion
+    ds_type: 'json'
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_small_eval/koishi-dolly.jsonl'
+    name: 'koishi-dolly'
+    type: pygmalion
+    ds_type: 'json'
 
 dataset_prepared_path: /workspace/dataset_prepared_path
 output_dir: /workspace/stablelm-3b-instruct
@@ -63,9 +72,9 @@ max_steps: 720  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch 
 logging_steps: 2  # max_steps * 0.002
 warmup_steps: 20  # max_steps * 0.02
 save_steps: 0.25  # 1 / epochs
+eval_steps: 36
 
 val_set_size: 0
-eval_steps:  # No split for streaming.
 eval_table_size:
 eval_table_max_new_tokens:
 debug:
