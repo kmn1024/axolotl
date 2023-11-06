@@ -75,6 +75,7 @@ class Perturber:
     def __init__(self):
         print('Creating Perturber')
         self.nlp = spacy.load('en_core_web_sm', disable=['tagger', 'parser', 'ner'])
+        self.nlp.max_length = 2000000
         self.homophones = {}
         assert os.path.isfile(HOMOPHONE_FILE), HOMOPHONE_FILE
         with tarfile.open(HOMOPHONE_FILE, 'r:gz') as tar:

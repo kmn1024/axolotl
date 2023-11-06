@@ -277,6 +277,71 @@ def pack_and_pad(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: Dict[
     }
     return ret
 
+# Pack with First Fit Decreasing.
+def pack_and_pad_ffd(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: Dict[str, List[int]]):
+    def to_flattened_list(input):
+        output = []
+        for seq in input:
+            assert isinstance(seq, list), f'Unsupported input: {seq}'
+            if isinstance(seq[0], int):
+                output.append(seq)
+            elif isinstance(seq[0], list):
+                output += to_flattened_list(seq)
+            else:
+                assert False, f'Unsupported sub-input: {seq[0]}'
+        return output
+
+    IGNORE_TOKEN_ID = -100  # Copied from prompt_strategies
+    flattened_input_ids = to_flattened_list(res["input_ids"])
+    sorted_input_ids_idx = [(idx, torch.tensor(ids)) for idx, ids in sorted(enumerate(flattened_input_ids), key=lambda x:len(x[1]), reverse=True)]
+    original_labels = [torch.tensor(l) for l in to_flattened_list(res["labels"])]
+    original_attention_mask = [torch.tensor(l) for l in to_flattened_list(res["attention_mask"])]
+
+    # Concatenate tokens so that their lengths are less than max_tokens
+    bins = []
+     # Try to fit ids into each bin.
+    for original_idx, ids in sorted_input_ids_idx:
+        ids_length = ids.numel()
+        if ids_length > max_tokens:
+            LOG.warning(f'pack_and_pad skip long input: {ids.numel()} > {max_tokens}')
+            continue
+
+        labels = original_labels[original_idx]
+        assert labels.numel() == ids_length
+        masks = original_attention_mask[original_idx]
+        assert masks.numel() == ids_length
+        for bin in bins:
+            if bin["remaining_space"] >= ids_length:
+                # ids fits into this bin. Add it and update remaining_space.
+                bin["input_ids"][bin["used_space"]:bin["used_space"] + ids_length] = ids
+                bin["labels"][bin["used_space"]:bin["used_space"] + ids_length] = labels
+                bin["attention_mask"][bin["used_space"]:bin["used_space"] + ids_length] = masks
+                bin["used_space"] += ids_length
+                bin["remaining_space"] -= ids_length
+                break
+        else:  # no break
+            # ids didn't fit into any bin. Create a new bin.
+            bin_input_ids = torch.full((max_tokens,), tokenizer.pad_token_id, dtype=torch.long)
+            bin_labels = torch.full((max_tokens,), IGNORE_TOKEN_ID, dtype=torch.long)
+            bin_attention_mask = torch.full((max_tokens,), 0, dtype=torch.long)
+            bin_input_ids[:ids_length] = ids
+            bin_labels[:ids_length] = labels
+            bin_attention_mask[:ids_length] = masks
+            bins.append({
+                "input_ids": bin_input_ids,
+                "labels": bin_labels,
+                "attention_mask": bin_attention_mask,
+                "used_space": ids_length,
+                "remaining_space": max_tokens - ids_length
+            })
+
+    ret = {
+        "input_ids": [bin["input_ids"].tolist() for bin in bins],
+        "labels": [bin["labels"].tolist() for bin in bins],
+        "attention_mask": [bin["attention_mask"].tolist() for bin in bins],
+    }
+    return ret
+
 
 def load_tokenized_prepared_datasets_local_stream(
     tokenizer, cfg, dataset_configs, is_eval 
@@ -351,14 +416,18 @@ def load_tokenized_prepared_datasets_local_stream(
                 )
 
     LOG.info("merging datasets")
-    probabilities = [s / sum(dataset_sizes) for s in dataset_sizes]
-    dataset = interleave_datasets(datasets, probabilities, seed=seed, stopping_strategy='all_exhausted')
+    if is_eval:
+        dataset = concatenate_datasets(datasets)
+        finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len)
+    else:
+        probabilities = [s / sum(dataset_sizes) for s in dataset_sizes]
+        dataset = interleave_datasets(datasets, probabilities, seed=seed, stopping_strategy='first_exhausted')
+        finalize_ds = functools.partial(pack_and_pad, tokenizer, cfg.sequence_len)
     LOG.info("finalize datasets")
-    finalize_ds = functools.partial(pack_and_pad, tokenizer, cfg.sequence_len)
     dataset = dataset.map(
         finalize_ds,
         batched=True,
-        batch_size=16,
+        batch_size=64,
     )
     return dataset
 
