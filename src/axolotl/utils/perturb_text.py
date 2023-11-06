@@ -1,5 +1,5 @@
 import json
-import nltk
+import spacy
 import random
 import tarfile
 import unicodedata
@@ -9,13 +9,14 @@ import numpy as np
 from unidecode import unidecode
 from nltk.corpus import words
 
-def get_words_and_separators(text):
-    tokens = nltk.word_tokenize(text)
+def get_words_and_separators(nlp, text):
+    tokens = [token.text for token in nlp(text)]
     separators = []
     start = 0
-    for token in tokens:
+    for idx, token in enumerate(tokens):
         # Find the position of the next token in the string, starting from 'start'
         pos = text.find(token, start)
+        assert pos != -1, print(f'{text} \n {tokens} \n violating {idx}: {token}')
         # Extract the separator: the part of the string before this token
         if start != 0:
             separator = text[start:pos]
@@ -73,6 +74,7 @@ class Perturber:
 
     def __init__(self):
         print('Creating Perturber')
+        self.nlp = spacy.load('en_core_web_sm', disable=['tagger', 'parser', 'ner'])
         self.homophones = {}
         assert os.path.isfile(HOMOPHONE_FILE), HOMOPHONE_FILE
         with tarfile.open(HOMOPHONE_FILE, 'r:gz') as tar:
@@ -88,7 +90,7 @@ class Perturber:
         return unidecode(word.lower())
 
     def perturb_text(self, text):
-        tokens, separators = get_words_and_separators(text)
+        tokens, separators = get_words_and_separators(self.nlp, text)
         new_tokens, new_separators = [], []
         perturb_idx = 0
         for idx in range(len(tokens)):
@@ -141,5 +143,7 @@ class Perturber:
             return text  # Fallback
         output = [new_tokens[idx] + new_separators[idx] for idx in range(len(new_tokens) - 1)]
         output_str = ''.join(output) + new_tokens[-1]
+        # Sanity
+        assert len(output_str) < 2 * len(text), f'Impossible growth: {len(text)} -> {len(output_str)}. {text} \n {tokens}'
         #print(f'Perturbed: {text} -> {output_str}')
         return output_str
