@@ -310,13 +310,17 @@ def load_tokenized_prepared_datasets_local_stream(
             ds_type = "csv"
         elif ".txt" in ds_fullpath:
             ds_type = "text"
-        return load_dataset(
+        ds = load_dataset(
             ds_type,
             name=ds_name,
             data_files=ds_fullpath,
             streaming=False if is_eval else True,
             split=None,
         )
+        if not is_eval:
+            ds = ds.shuffle(seed=seed, buffer_size=cfg.micro_batch_size * 16)
+        return ds
+
 
     # pylint: disable=invalid-name
     datasets, dataset_sizes = [], []
@@ -350,13 +354,12 @@ def load_tokenized_prepared_datasets_local_stream(
     LOG.info("merging datasets")
     probabilities = [s / sum(dataset_sizes) for s in dataset_sizes]
     dataset = interleave_datasets(datasets, probabilities, seed=seed, stopping_strategy='all_exhausted')
-    if not is_eval:
-        dataset = dataset.shuffle(seed=seed, buffer_size=(cfg.micro_batch_size * 64))
     LOG.info("finalize datasets")
     finalize_ds = functools.partial(pack_and_pad, tokenizer, cfg.sequence_len)
     dataset = dataset.map(
         finalize_ds,
         batched=True,
+        batch_size=16,
     )
     return dataset
 
