@@ -290,7 +290,6 @@ def load_tokenized_prepared_datasets_local_stream(
         seed = 42
     random.seed(seed)
 
-    datasets = []
     def for_d_in_datasets(dataset_configs):
         for dataset in dataset_configs:
             if dataset.name and isinstance(dataset.name, list):
@@ -320,6 +319,7 @@ def load_tokenized_prepared_datasets_local_stream(
         )
 
     # pylint: disable=invalid-name
+    datasets, dataset_sizes = [], []
     for d in for_d_in_datasets(dataset_configs):
         # prefer local dataset, even if hub exists
         local_path = Path(d.path)
@@ -335,20 +335,23 @@ def load_tokenized_prepared_datasets_local_stream(
                     wrapped_ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
                     if wrapped_ds:
                         datasets.append(wrapped_ds)
+                        dataset_sizes.append(os.stat(dir_filepath).st_size)
             elif local_path.is_file():
                 ds = load_streaming_ds(d.ds_type, d.name, d.path)
                 wrapped_ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
                 if wrapped_ds:
                     datasets.append(wrapped_ds)
+                    dataset_sizes.append(os.stat(d.path).st_size)
             else:
                 raise ValueError(
                     "unhandled dataset load: local path exists, but is neither a directory or a file"
                 )
 
     LOG.info("merging datasets")
-    dataset = interleave_datasets(datasets, seed=seed, stopping_strategy='all_exhausted')
+    probabilities = [s / sum(dataset_sizes) for s in dataset_sizes]
+    dataset = interleave_datasets(datasets, probabilities, seed=seed, stopping_strategy='all_exhausted')
     if not is_eval:
-        dataset = dataset.shuffle(seed=seed, buffer_size=10_000)
+        dataset = dataset.shuffle(seed=seed, buffer_size=(cfg.micro_batch_size * 64))
     LOG.info("finalize datasets")
     finalize_ds = functools.partial(pack_and_pad, tokenizer, cfg.sequence_len)
     dataset = dataset.map(
