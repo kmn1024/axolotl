@@ -60,11 +60,10 @@ def md5(to_hash: str, encoding: str = "utf-8") -> str:
 
 def prepare_dataset(cfg, tokenizer):
     if cfg.local_streaming_datasets:
-        with zero_first(is_main_process()):
-            train_dataset = load_tokenized_prepared_datasets_local_stream(tokenizer, cfg, cfg.datasets, is_eval=False)
-            eval_dataset = load_tokenized_prepared_datasets_local_stream(tokenizer, cfg, cfg.eval_datasets, is_eval=True) if cfg.eval_datasets else None
-            if eval_dataset:
-                print(f'Eval examples: {len(eval_dataset)}')
+        train_dataset = load_tokenized_prepared_datasets_local_stream(tokenizer, cfg, cfg.datasets, is_eval=False)
+        eval_dataset = load_tokenized_prepared_datasets_local_stream(tokenizer, cfg, cfg.eval_datasets, is_eval=True) if cfg.eval_datasets else None
+        if eval_dataset:
+            print(f'Eval examples: {len(eval_dataset)}')
         return train_dataset, eval_dataset, cfg.max_steps
     elif not cfg.pretraining_dataset:
         with zero_first(is_main_process()):
