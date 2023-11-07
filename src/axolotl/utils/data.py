@@ -442,10 +442,12 @@ def load_tokenized_prepared_datasets_local_stream(
                 print(f"Starting dataset {idx}")
                 for item_idx, item in enumerate(ds):
                     if item_idx % 10 == 0: 
-                        print(f'Yielded {item_idx} items from dataset {idx}. {item}')
+                        print(f'Yielded {item_idx} items from dataset {idx}.')
+                        print(item.keys())
+                        print(len(item[list(item.keys())[0]]))
                     yield item
             print("Generator exhausted")
-        dataset = IterableDataset.from_generator(gen, gen_kwargs={"shards": datasets})
+        dataset = IterableDataset.from_generator(gen, gen_kwargs={"datasets": datasets})
 
         # probabilities = [s / sum(dataset_sizes) for s in dataset_sizes]
         # dataset = interleave_datasets(datasets, probabilities, seed=seed, stopping_strategy='first_exhausted')
