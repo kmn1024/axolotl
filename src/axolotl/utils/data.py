@@ -436,10 +436,15 @@ def load_tokenized_prepared_datasets_local_stream(
             batch_size=64,
         ) for dataset in datasets]
 
-        def gen(shards):
-            for ds in shards:
-                for item in ds:
+        def gen(datasets):
+            print("Creating generator")
+            for idx, ds in enumerate(datasets):
+                print(f"Starting dataset {idx}")
+                for item_idx, item in enumerate(ds):
+                    if item_idx % 10 == 0: 
+                        print(f'Yielded {item_idx} items from dataset {idx}. {item}')
                     yield item
+            print("Generator exhausted")
         dataset = IterableDataset.from_generator(gen, gen_kwargs={"shards": datasets})
 
         # probabilities = [s / sum(dataset_sizes) for s in dataset_sizes]
