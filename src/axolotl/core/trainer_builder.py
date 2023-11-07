@@ -22,6 +22,7 @@ from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler, SequentialSampler
 from transformers import EarlyStoppingCallback, Trainer, TrainingArguments
 from transformers.trainer_pt_utils import SequentialDistributedSampler
+from transformers.trainer_utils import has_length
 
 from axolotl.monkeypatch.relora import ReLoRACallback, ReLoRAScheduler
 from axolotl.utils.callbacks import (
@@ -194,7 +195,12 @@ class AxolotlTrainer(Trainer):
                 "pin_memory": self.args.dataloader_pin_memory,
                 "prefetch_factor": 2,
             }
-            return self.accelerator.prepare(DataLoader(self.train_dataset, **dataloader_params))
+            data_loader = DataLoader(self.train_dataset, **dataloader_params)
+            if has_length(data_loader):
+                print(f'DataLoader length: {len(data_loader)}')
+            else:
+                print('DataLoader no length')
+            return self.accelerator.prepare()
         else:
             return super().get_train_dataloader()
 

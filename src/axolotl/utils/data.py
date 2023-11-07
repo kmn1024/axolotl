@@ -1,4 +1,7 @@
 """Module containing data utilities"""
+import torch.multiprocessing
+torch.multiprocessing.set_sharing_strategy('file_system')
+
 import functools
 import glob
 import hashlib
@@ -433,10 +436,12 @@ def load_tokenized_prepared_datasets_local_stream(
             batch_size=64,
         ) for dataset in datasets]
 
-        def gen(ds):
-            for item in ds:
-                yield item
+        def gen(shards):
+            for ds in shards:
+                for item in ds:
+                    yield item
         dataset = IterableDataset.from_generator(gen, gen_kwargs={"shards": datasets})
+
         # probabilities = [s / sum(dataset_sizes) for s in dataset_sizes]
         # dataset = interleave_datasets(datasets, probabilities, seed=seed, stopping_strategy='first_exhausted')
         print(f'Training data shards: {dataset.n_shards}')
