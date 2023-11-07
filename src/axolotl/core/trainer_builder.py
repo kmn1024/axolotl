@@ -200,7 +200,7 @@ class AxolotlTrainer(Trainer):
                 print(f'DataLoader length: {len(data_loader)}')
             else:
                 print('DataLoader no length')
-            return self.accelerator.prepare()
+            return self.accelerator.prepare(data_loader)
         else:
             return super().get_train_dataloader()
 
