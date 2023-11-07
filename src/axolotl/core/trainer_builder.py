@@ -182,10 +182,21 @@ class AxolotlTrainer(Trainer):
                 )
             )
         elif self.args.world_size > 1:
+            print(f'get_train_dataloader input shards: {self.train_dataset.n_shards}')
             self.train_dataset = split_dataset_by_node(self.train_dataset,
                                                        rank=self.args.process_index,
                                                        world_size=self.args.world_size)
-        return super().get_train_dataloader()
+            print(f'split_dataset_by_node shards: {self.train_dataset.n_shards}')
+            dataloader_params = {
+                "batch_size": self._train_batch_size,
+                "collate_fn": self.data_collator,
+                "num_workers": self.args.dataloader_num_workers,
+                "pin_memory": self.args.dataloader_pin_memory,
+                "prefetch_factor": 2,
+            }
+            return self.accelerator.prepare(DataLoader(self.train_dataset, **dataloader_params))
+        else:
+            return super().get_train_dataloader()
 
     def get_eval_dataloader(
         self, eval_dataset: Optional[Dataset] = None

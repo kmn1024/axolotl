@@ -12,6 +12,7 @@ import torch
 from datasets import (
     Dataset,
     DatasetDict,
+    IterableDataset,
     concatenate_datasets,
     interleave_datasets,
     load_dataset,
@@ -419,16 +420,27 @@ def load_tokenized_prepared_datasets_local_stream(
     if is_eval:
         dataset = concatenate_datasets(datasets)
         finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len)
+        dataset = dataset.map(
+            finalize_ds,
+            batched=True,
+            batch_size=64,
+        )
     else:
-        probabilities = [s / sum(dataset_sizes) for s in dataset_sizes]
-        dataset = interleave_datasets(datasets, probabilities, seed=seed, stopping_strategy='first_exhausted')
         finalize_ds = functools.partial(pack_and_pad, tokenizer, cfg.sequence_len)
-    LOG.info("finalize datasets")
-    dataset = dataset.map(
-        finalize_ds,
-        batched=True,
-        batch_size=64,
-    )
+        datasets = [dataset.map(
+            finalize_ds,
+            batched=True,
+            batch_size=64,
+        ) for dataset in datasets]
+
+        def gen(ds):
+            for item in ds:
+                yield item
+        dataset = IterableDataset.from_generator(gen, gen_kwargs={"shards": datasets})
+        # probabilities = [s / sum(dataset_sizes) for s in dataset_sizes]
+        # dataset = interleave_datasets(datasets, probabilities, seed=seed, stopping_strategy='first_exhausted')
+        print(f'Training data shards: {dataset.n_shards}')
+
     return dataset
 
 
