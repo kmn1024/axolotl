@@ -387,13 +387,11 @@ def load_tokenized_prepared_datasets_local_stream(
             streaming=False if is_eval else True,
             split=None,
         )
-        if not is_eval:
-            ds = ds.shuffle(seed=seed, buffer_size=cfg.micro_batch_size * 16)
         return ds
 
     if is_eval:
         # pylint: disable=invalid-name
-        datasets, dataset_sizes, ds_names = [], [], []
+        datasets = []
         for d in for_d_in_datasets(dataset_configs):
             # prefer local dataset, even if hub exists
             local_path = Path(d.path)
@@ -409,15 +407,11 @@ def load_tokenized_prepared_datasets_local_stream(
                         wrapped_ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
                         if wrapped_ds:
                             datasets.append(wrapped_ds)
-                            dataset_sizes.append(os.stat(dir_filepath).st_size)
-                            ds_names.append(file_ds_name)
                 elif local_path.is_file():
                     ds = load_streaming_ds(d.ds_type, d.name, d.path)
                     wrapped_ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
                     if wrapped_ds:
                         datasets.append(wrapped_ds)
-                        dataset_sizes.append(os.stat(d.path).st_size)
-                        ds_names.append(d.name)
                 else:
                     raise ValueError(
                         "unhandled dataset load: local path exists, but is neither a directory or a file"
@@ -439,13 +433,13 @@ def load_tokenized_prepared_datasets_local_stream(
                 if local_path.is_dir():
                     dir_filepaths = sorted(glob.glob(os.path.join(d.path, '*')))
                     assert len(dir_filepaths) > 0
-                    random.shuffle(dir_filepaths)
                     for dir_filepath in dir_filepaths:
                         assert os.path.isfile(dir_filepath), dir_filepath
                         file_ds_name = d.name + '_' + os.path.basename(dir_filepath)
                         datafiles.append((d, file_ds_name, dir_filepath))
                 elif local_path.is_file():
                     datafiles.append((d, d.name, d.path))
+        random.shuffle(dir_filepaths)
         
         d = None
         data_files = []
@@ -461,6 +455,7 @@ def load_tokenized_prepared_datasets_local_stream(
             streaming=True,
             split=None,
         )
+        ds = ds.shuffle(seed=seed)
         ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, True)
         finalize_ds = functools.partial(pack_and_pad, tokenizer, cfg.sequence_len)
         dataset = ds.map(
