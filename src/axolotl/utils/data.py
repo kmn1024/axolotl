@@ -404,12 +404,12 @@ def load_tokenized_prepared_datasets_local_stream(
                         assert os.path.isfile(dir_filepath), dir_filepath
                         file_ds_name = d.name + '_' + os.path.basename(dir_filepath)
                         ds = load_streaming_ds(d.ds_type, file_ds_name, dir_filepath)
-                        wrapped_ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=False)
+                        wrapped_ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
                         if wrapped_ds:
                             datasets.append(wrapped_ds)
                 elif local_path.is_file():
                     ds = load_streaming_ds(d.ds_type, d.name, d.path)
-                    wrapped_ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=False)
+                    wrapped_ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
                     if wrapped_ds:
                         datasets.append(wrapped_ds)
                 else:
@@ -417,13 +417,11 @@ def load_tokenized_prepared_datasets_local_stream(
                         "unhandled dataset load: local path exists, but is neither a directory or a file"
                     )
         dataset = concatenate_datasets(datasets)
-        num_proc = min(64, os.cpu_count())
         finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len)
         dataset = dataset.map(
             finalize_ds,
             batched=True,
             batch_size=64,
-            num_proc=num_proc,
         )
     else:
         # pylint: disable=invalid-name
