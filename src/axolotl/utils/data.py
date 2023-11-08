@@ -451,6 +451,7 @@ def load_tokenized_prepared_datasets_local_stream(
                         print(item.keys())
                         print(len(item[list(item.keys())[0]]))
                     yield item
+                print(f"Ending dataset {idx}: {ds.name}")
             print("Generator exhausted")
         dataset = IterableDataset.from_generator(gen, gen_kwargs={"datasets": datasets})
 
