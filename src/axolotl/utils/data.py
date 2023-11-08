@@ -391,7 +391,7 @@ def load_tokenized_prepared_datasets_local_stream(
 
 
     # pylint: disable=invalid-name
-    datasets, dataset_sizes = [], []
+    datasets, dataset_sizes, ds_names = [], [], []
     for d in for_d_in_datasets(dataset_configs):
         # prefer local dataset, even if hub exists
         local_path = Path(d.path)
@@ -408,12 +408,14 @@ def load_tokenized_prepared_datasets_local_stream(
                     if wrapped_ds:
                         datasets.append(wrapped_ds)
                         dataset_sizes.append(os.stat(dir_filepath).st_size)
+                        ds_names.append(file_ds_name)
             elif local_path.is_file():
                 ds = load_streaming_ds(d.ds_type, d.name, d.path)
                 wrapped_ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
                 if wrapped_ds:
                     datasets.append(wrapped_ds)
                     dataset_sizes.append(os.stat(d.path).st_size)
+                    ds_names.append(d.name)
             else:
                 raise ValueError(
                     "unhandled dataset load: local path exists, but is neither a directory or a file"
@@ -436,10 +438,13 @@ def load_tokenized_prepared_datasets_local_stream(
             batch_size=64,
         ) for dataset in datasets]
 
+        for d, name in zip(datasets, ds_names):
+            d.name = name
+
         def gen(datasets):
             print("Creating generator")
             for idx, ds in enumerate(datasets):
-                print(f"Starting dataset {idx}")
+                print(f"Starting dataset {idx}: {ds.name}")
                 for item_idx, item in enumerate(ds):
                     if item_idx % 10 == 0: 
                         print(f'Yielded {item_idx} items from dataset {idx}.')
