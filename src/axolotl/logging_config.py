@@ -55,7 +55,7 @@ DEFAULT_LOGGING_CONFIG: Dict[str, Any] = {
             "stream": sys.stdout,
         },
     },
-    "root": {"handlers": ["console"], "level": os.getenv("LOG_LEVEL", "DEBUG")},
+    "root": {"handlers": ["console"], "level": os.getenv("LOG_LEVEL", "INFO")},
     "loggers": {
         "axolotl": {
             "handlers": ["color_console"],
@@ -65,7 +65,7 @@ DEFAULT_LOGGING_CONFIG: Dict[str, Any] = {
     },
 }
 
-transformers.logging.set_verbosity_debug()
+transformers.logging.set_verbosity_info()
 
 def configure_logging():
     """Configure with default logging"""

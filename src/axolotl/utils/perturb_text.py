@@ -74,7 +74,7 @@ class Perturber:
 
     def __init__(self):
         print('Creating Perturber')
-        self.nlp = spacy.load('en_core_web_sm', disable=['tagger', 'parser', 'ner'])
+        self.nlp = spacy.load('en_core_web_sm', disable=['tagger', 'parser', 'ner', 'lemmatizer'])
         self.nlp.max_length = 2000000
         self.homophones = {}
         assert os.path.isfile(HOMOPHONE_FILE), HOMOPHONE_FILE
@@ -90,7 +90,10 @@ class Perturber:
     def normalize_for_lookup(self, word):
         return unidecode(word.lower())
 
-    def perturb_text(self, text):
+    def perturb_text(self, text, perturb_prob_factor=1.0, skip_perterb_prob=999):
+        if skip_perterb_prob < 1 and random.random() <= skip_perterb_prob:
+            return text
+        
         tokens, separators = get_words_and_separators(self.nlp, text)
         new_tokens, new_separators = [], []
         perturb_idx = 0
@@ -100,7 +103,7 @@ class Perturber:
             else:
                 perturb_prob = self.perturb_schedule[perturb_idx] if perturb_idx < len(self.perturb_schedule) else self.perturb_schedule[-1]
                 perturb_idx += 1
-                perturb = random.random() <= perturb_prob
+                perturb = random.random() <= (perturb_prob * perturb_prob_factor)
             
             if perturb:
                 perturb_type_dice = random.random()

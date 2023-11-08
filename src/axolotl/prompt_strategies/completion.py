@@ -42,7 +42,8 @@ class CompletionPromptTokenizingStrategy(InstructionPromptTokenizingStrategy):
 
     def tokenize_prompt(self, prompt):
         text_field = prompt[self._field]
-        text_field = self.perturber.perturb_text(text_field)
+        # Milder perturbations.
+        text_field = self.perturber.perturb_text(text_field, perturb_prob_factor=0.5, skip_perterb_prob=0.5)
         tokenized_full_prompt = self._tokenize(text_field)
         res = {}
         for key, val in tokenized_full_prompt.items():
