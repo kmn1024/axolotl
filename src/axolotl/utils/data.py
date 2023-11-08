@@ -20,7 +20,9 @@ from datasets import (
     interleave_datasets,
     load_dataset,
     load_from_disk,
+
 )
+
 from huggingface_hub import hf_hub_download
 from transformers import PreTrainedTokenizerBase
 
@@ -389,40 +391,37 @@ def load_tokenized_prepared_datasets_local_stream(
             ds = ds.shuffle(seed=seed, buffer_size=cfg.micro_batch_size * 16)
         return ds
 
-
-    # pylint: disable=invalid-name
-    datasets, dataset_sizes, ds_names = [], [], []
-    for d in for_d_in_datasets(dataset_configs):
-        # prefer local dataset, even if hub exists
-        local_path = Path(d.path)
-        if local_path.exists():
-            if local_path.is_dir():
-                dir_filepaths = sorted(glob.glob(os.path.join(d.path, '*')))
-                assert len(dir_filepaths) > 0
-                random.shuffle(dir_filepaths)
-                for dir_filepath in dir_filepaths:
-                    assert os.path.isfile(dir_filepath), dir_filepath
-                    file_ds_name = d.name + '_' + os.path.basename(dir_filepath)
-                    ds = load_streaming_ds(d.ds_type, file_ds_name, dir_filepath)
+    if is_eval:
+        # pylint: disable=invalid-name
+        datasets, dataset_sizes, ds_names = [], [], []
+        for d in for_d_in_datasets(dataset_configs):
+            # prefer local dataset, even if hub exists
+            local_path = Path(d.path)
+            if local_path.exists():
+                if local_path.is_dir():
+                    dir_filepaths = sorted(glob.glob(os.path.join(d.path, '*')))
+                    assert len(dir_filepaths) > 0
+                    random.shuffle(dir_filepaths)
+                    for dir_filepath in dir_filepaths:
+                        assert os.path.isfile(dir_filepath), dir_filepath
+                        file_ds_name = d.name + '_' + os.path.basename(dir_filepath)
+                        ds = load_streaming_ds(d.ds_type, file_ds_name, dir_filepath)
+                        wrapped_ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
+                        if wrapped_ds:
+                            datasets.append(wrapped_ds)
+                            dataset_sizes.append(os.stat(dir_filepath).st_size)
+                            ds_names.append(file_ds_name)
+                elif local_path.is_file():
+                    ds = load_streaming_ds(d.ds_type, d.name, d.path)
                     wrapped_ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
                     if wrapped_ds:
                         datasets.append(wrapped_ds)
-                        dataset_sizes.append(os.stat(dir_filepath).st_size)
-                        ds_names.append(file_ds_name)
-            elif local_path.is_file():
-                ds = load_streaming_ds(d.ds_type, d.name, d.path)
-                wrapped_ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
-                if wrapped_ds:
-                    datasets.append(wrapped_ds)
-                    dataset_sizes.append(os.stat(d.path).st_size)
-                    ds_names.append(d.name)
-            else:
-                raise ValueError(
-                    "unhandled dataset load: local path exists, but is neither a directory or a file"
-                )
-
-    LOG.info("merging datasets")
-    if is_eval:
+                        dataset_sizes.append(os.stat(d.path).st_size)
+                        ds_names.append(d.name)
+                else:
+                    raise ValueError(
+                        "unhandled dataset load: local path exists, but is neither a directory or a file"
+                    )
         dataset = concatenate_datasets(datasets)
         finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len)
         dataset = dataset.map(
@@ -431,34 +430,45 @@ def load_tokenized_prepared_datasets_local_stream(
             batch_size=64,
         )
     else:
+        # pylint: disable=invalid-name
+        datafiles = []
+        for d in for_d_in_datasets(dataset_configs):
+            # prefer local dataset, even if hub exists
+            local_path = Path(d.path)
+            if local_path.exists():
+                if local_path.is_dir():
+                    dir_filepaths = sorted(glob.glob(os.path.join(d.path, '*')))
+                    assert len(dir_filepaths) > 0
+                    random.shuffle(dir_filepaths)
+                    for dir_filepath in dir_filepaths:
+                        assert os.path.isfile(dir_filepath), dir_filepath
+                        file_ds_name = d.name + '_' + os.path.basename(dir_filepath)
+                        datafiles.append((d, file_ds_name, dir_filepath))
+                elif local_path.is_file():
+                    datafiles.append((d, d.name, d.path))
+        
+        d = None
+        data_files = []
+        for this_d, name, path in datafiles:
+            data_files.append(path)
+            if d is None:
+                d = this_d
+            else:
+                assert this_d.ds_type == d.ds_type
+        ds = load_dataset(
+            d.ds_type,
+            data_files=data_files,
+            streaming=True,
+            split=None,
+        )
+        ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, True)
         finalize_ds = functools.partial(pack_and_pad, tokenizer, cfg.sequence_len)
-        datasets = [dataset.map(
+        dataset = ds.map(
             finalize_ds,
             batched=True,
             batch_size=64,
-        ) for dataset in datasets]
-
-        for d, name in zip(datasets, ds_names):
-            d.name = name
-
-        def gen(datasets):
-            print("Creating generator")
-            for idx, ds in enumerate(datasets):
-                print(f"Starting dataset {idx}: {ds.name}")
-                for item_idx, item in enumerate(ds):
-                    if item_idx % 10 == 0: 
-                        print(f'Yielded {item_idx} items from dataset {idx}: {ds.name}')
-                        print(item.keys())
-                        print(len(item[list(item.keys())[0]]))
-                    yield item
-                print(f"Ending dataset {idx}: {ds.name}")
-            print("Generator exhausted")
-        dataset = IterableDataset.from_generator(gen, gen_kwargs={"datasets": datasets})
-
-        # probabilities = [s / sum(dataset_sizes) for s in dataset_sizes]
-        # dataset = interleave_datasets(datasets, probabilities, seed=seed, stopping_strategy='first_exhausted')
-        print(f'Training data shards: {dataset.n_shards}')
-
+        )
+        print(f'Training data shards: {ds.n_shards}')
     return dataset
 
 
