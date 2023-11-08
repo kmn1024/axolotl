@@ -447,7 +447,7 @@ def load_tokenized_prepared_datasets_local_stream(
                 print(f"Starting dataset {idx}: {ds.name}")
                 for item_idx, item in enumerate(ds):
                     if item_idx % 10 == 0: 
-                        print(f'Yielded {item_idx} items from dataset {idx}.')
+                        print(f'Yielded {item_idx} items from dataset {idx}: {ds.name}')
                         print(item.keys())
                         print(len(item[list(item.keys())[0]]))
                     yield item
