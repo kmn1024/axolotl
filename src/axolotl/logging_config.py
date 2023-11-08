@@ -4,6 +4,7 @@ Common logging module for axolotl
 
 import os
 import sys
+import transformers
 from logging import Formatter
 from logging.config import dictConfig
 from typing import Any, Dict
@@ -64,6 +65,7 @@ DEFAULT_LOGGING_CONFIG: Dict[str, Any] = {
     },
 }
 
+transformers.logging.set_verbosity_debug()
 
 def configure_logging():
     """Configure with default logging"""
