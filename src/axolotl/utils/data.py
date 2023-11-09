@@ -399,7 +399,6 @@ def load_tokenized_prepared_datasets_local_stream(
                 if local_path.is_dir():
                     dir_filepaths = sorted(glob.glob(os.path.join(d.path, '*')))
                     assert len(dir_filepaths) > 0
-                    random.shuffle(dir_filepaths)
                     for dir_filepath in dir_filepaths:
                         assert os.path.isfile(dir_filepath), dir_filepath
                         file_ds_name = d.name + '_' + os.path.basename(dir_filepath)
@@ -439,7 +438,6 @@ def load_tokenized_prepared_datasets_local_stream(
                         datafiles.append((d, file_ds_name, dir_filepath))
                 elif local_path.is_file():
                     datafiles.append((d, d.name, d.path))
-        random.shuffle(dir_filepaths)
         
         d = None
         data_files = []
@@ -455,7 +453,6 @@ def load_tokenized_prepared_datasets_local_stream(
             streaming=True,
             split=None,
         )
-        ds = ds.shuffle(seed=seed)
         ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
         finalize_ds = functools.partial(pack_and_pad, tokenizer, cfg.sequence_len)
         dataset = ds.map(
