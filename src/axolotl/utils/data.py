@@ -454,7 +454,7 @@ def load_tokenized_prepared_datasets_local_stream(
             split=None,
         )
         ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
-        finalize_ds = functools.partial(pack_and_pad, tokenizer, cfg.sequence_len)
+        finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len)
         dataset = ds.map(
             finalize_ds,
             batched=True,

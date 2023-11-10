@@ -35,18 +35,15 @@ wandb_watch:
 wandb_run_id:
 wandb_log_model:
 
-hub_strategy: checkpoint
-hub_model_id: cckm/stablelm-3b-pretrain-full
-
-dataloader_num_workers: 32
-gradient_accumulation_steps: 4
+dataloader_num_workers: 16
+gradient_accumulation_steps: 32
 micro_batch_size: 6
 optimizer: adamw_torch
 adam_beta1: 0.9
 adam_beta2: 0.95
-adam_epsilon: 0.000001  # 0.00001 for better stability
+adam_epsilon: 0.00001  # 0.00001 for better stability
 lr_scheduler: cosine
-learning_rate: 0.0001
+learning_rate: 0.0003
 weight_decay: 0.1
 max_grad_norm: 1.0
 
@@ -63,11 +60,11 @@ local_rank:
 xformers_attention:
 flash_attention: true
 
-max_steps: 12000  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps * GPUs) = (332232000/5.5) / (4096*6*2*2)
-logging_steps: 24  # max_steps * 0.002
-warmup_steps: 240  # max_steps * 0.02
+max_steps: 1200  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps * GPUs) = (332232000/5.5) / (4096*6*2*2)
+logging_steps: 1
+warmup_steps: 12
 save_steps: 0.05  # 1 / epochs
-eval_steps: 300
+eval_steps: 12
 
 val_set_size: 0
 eval_table_size:
