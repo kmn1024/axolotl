@@ -116,16 +116,28 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
             else:
                 assert False, f"unknown role in conversation: {role}"
         
-        OVERLAP = int(0.5 * self.sequence_len)
-        chunked_result, _ = tokenize_prompt_default()
         if current_len <= self.sequence_len:
-            for key, val in result.items():
-                chunked_result[key].append(val)
-        else:        
-            # Else, need to chunk into multiple examples.
-            for key, val in result.items():
-                for i in range(0, len(val), OVERLAP):
-                    chunked_result[key].append(val[i : i + self.sequence_len])
+            return result
+        
+        INCREMENT = int(0.7 * self.sequence_len)
+        chunked_result, _ = tokenize_prompt_default()
+        # Else, need to chunk into multiple examples. The overlapping tokens must be masked.
+        previous_end = 0
+        for key, val in result.items():
+            if key == 'attention_mask':
+                mask = 0
+            elif key == 'labels':
+                mask = IGNORE_TOKEN_ID
+            else:
+                assert key == 'input_ids'
+
+            for i in range(0, len(val), INCREMENT):
+                chunked_result[key].append(val[i : i + self.sequence_len])
+                if mask and previous_end > 0:
+                    mask_range = previous_end - i
+                    assert mask_range > 0, f'{previous_end} : {i} from {len(val)}'
+                    chunked_result[key][-1][:mask_range] = [mask]*mask_range
+                previous_end = i + self.sequence_len
         return chunked_result
 
 

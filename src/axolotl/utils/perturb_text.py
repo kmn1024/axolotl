@@ -74,6 +74,7 @@ class Perturber:
 
     def __init__(self):
         print('Creating Perturber')
+        self.disable = False
         self.nlp = spacy.load('en_core_web_sm', disable=['tagger', 'parser', 'ner', 'lemmatizer'])
         self.nlp.max_length = 2000000
         self.homophones = {}
@@ -91,6 +92,8 @@ class Perturber:
         return unidecode(word.lower())
 
     def perturb_text(self, text, perturb_prob_factor=1.0, skip_perterb_prob=999):
+        if self.disable:
+            return text
         if skip_perterb_prob < 1 and random.random() <= skip_perterb_prob:
             return text
         
