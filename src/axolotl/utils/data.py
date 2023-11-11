@@ -219,90 +219,25 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
             remove_columns=cfg.dataset_columns,
             **map_kwargs,
         )
-        def add_position_ids(sample):
-            if isinstance(sample["input_ids"][0], list):
-                sample["position_ids"] = []
-                for input_ids in sample["input_ids"]:
-                    sample["position_ids"].append(list(range(len(input_ids))))
-            else:
-                assert isinstance(sample["input_ids"][0], int), sample["input_ids"]
-                sample["position_ids"] = list(range(len(sample["input_ids"])))
-            return sample
-        return ds.map(add_position_ids, **map_kwargs)
+        if cfg.flash_attention:
+            def add_position_ids(sample):
+                if isinstance(sample["input_ids"][0], list):
+                    sample["position_ids"] = []
+                    for input_ids in sample["input_ids"]:
+                        sample["position_ids"].append(list(range(len(input_ids))))
+                else:
+                    assert isinstance(sample["input_ids"][0], int), sample["input_ids"]
+                    sample["position_ids"] = list(range(len(sample["input_ids"])))
+                return sample
+            ds = ds.map(add_position_ids, **map_kwargs)
+        return ds
     else:
         ds_wrapper = TokenizedPromptDataset(ds_strategy, ds, remove_columns=None)
         return ds_wrapper
 
 
-def pack_and_pad(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: Dict[str, List[int]]):
-    def to_tensor_list(input):
-        output = []
-        for seq in input:
-            assert isinstance(seq, list), f'Unsupported input: {seq}'
-            if isinstance(seq[0], int):
-                output.append(torch.tensor(seq))
-            elif isinstance(seq[0], list):
-                output += to_tensor_list(seq)
-            else:
-                assert False, f'Unsupported sub-input: {seq[0]}'
-        return output
-
-    IGNORE_TOKEN_ID = -100  # Copied from prompt_strategies
-    input_ids = to_tensor_list(res["input_ids"])
-    labels = to_tensor_list(res["labels"])
-    attention_mask = to_tensor_list(res["attention_mask"])
-    position_ids = to_tensor_list(res["position_ids"])
-
-    # Concatenate tokens so that their lengths are less than max_tokens
-    new_input_ids = []
-    new_labels = []
-    new_attention_mask = []
-    new_position_ids = []
-    buffer_input_ids = torch.full((max_tokens,), tokenizer.pad_token_id, dtype=torch.long)
-    buffer_labels = torch.full((max_tokens,), IGNORE_TOKEN_ID, dtype=torch.long)
-    buffer_attention_mask = torch.full((max_tokens,), 0, dtype=torch.long)
-    buffer_position_ids = torch.full((max_tokens,), 0, dtype=torch.long)
-    buffer_len = 0
-
-    for ids, label, mask, pos_id in zip(input_ids, labels, attention_mask, position_ids):
-        # Drop entries that are too long.
-        ids_length = ids.numel()
-        if ids_length > max_tokens:
-            LOG.warning(f'pack_and_pad skip long input: {ids.numel()} > {max_tokens}')
-            continue
-        
-        if buffer_len == max_tokens or buffer_len + ids_length > max_tokens:
-            new_input_ids.append(buffer_input_ids.clone())
-            new_labels.append(buffer_labels.clone())
-            new_attention_mask.append(buffer_attention_mask.clone())
-            new_position_ids.append(buffer_position_ids.clone())
-            buffer_input_ids.fill_(tokenizer.pad_token_id)
-            buffer_labels.fill_(IGNORE_TOKEN_ID)
-            buffer_attention_mask.fill_(0)
-            buffer_position_ids.fill_(0)
-            buffer_len = 0
-        buffer_input_ids[buffer_len:buffer_len + ids_length] = ids
-        buffer_labels[buffer_len:buffer_len + ids_length] = label
-        buffer_attention_mask[buffer_len:buffer_len + ids_length] = mask
-        buffer_position_ids[buffer_len:buffer_len + ids_length] = pos_id
-        buffer_len += ids_length
-
-    if buffer_len > 0:  # for any leftover tokens
-        new_input_ids.append(buffer_input_ids.clone())
-        new_labels.append(buffer_labels.clone())
-        new_attention_mask.append(buffer_attention_mask.clone())
-        new_position_ids.append(buffer_position_ids.clone())
-
-    ret = {
-        "input_ids": [seq.tolist() for seq in new_input_ids],
-        "labels": [seq.tolist() for seq in new_labels],
-        "attention_mask": [seq.tolist() for seq in new_attention_mask],
-        "position_ids": [seq.tolist() for seq in new_position_ids],
-    }
-    return ret
-
 # Pack with First Fit Decreasing.
-def pack_and_pad_ffd(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: Dict[str, List[int]]):
+def pack_and_pad_ffd(tokenizer: PreTrainedTokenizerBase, max_tokens: int, use_flash: bool, res: Dict[str, List[int]]):
     def to_flattened_list(input):
         output = []
         for seq in input:
@@ -320,7 +255,8 @@ def pack_and_pad_ffd(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: D
     sorted_input_ids_idx = [(idx, torch.tensor(ids)) for idx, ids in sorted(enumerate(flattened_input_ids), key=lambda x:len(x[1]), reverse=True)]
     original_labels = [torch.tensor(l) for l in to_flattened_list(res["labels"])]
     original_attention_mask = [torch.tensor(l) for l in to_flattened_list(res["attention_mask"])]
-    original_position_ids = [torch.tensor(l) for l in to_flattened_list(res["position_ids"])]
+    if use_flash:
+        original_position_ids = [torch.tensor(l) for l in to_flattened_list(res["position_ids"])]
 
     # Concatenate tokens so that their lengths are less than max_tokens
     bins = []
@@ -335,43 +271,53 @@ def pack_and_pad_ffd(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: D
         assert labels.numel() == ids_length
         masks = original_attention_mask[original_idx]
         assert masks.numel() == ids_length
-        pos_ids = original_position_ids[original_idx]
-        assert pos_ids.numel() == ids_length
-        for bin in bins:
-            if bin["remaining_space"] >= ids_length:
-                # ids fits into this bin. Add it and update remaining_space.
-                bin["input_ids"][bin["used_space"]:bin["used_space"] + ids_length] = ids
-                bin["labels"][bin["used_space"]:bin["used_space"] + ids_length] = labels
-                bin["attention_mask"][bin["used_space"]:bin["used_space"] + ids_length] = masks
-                bin["position_ids"][bin["used_space"]:bin["used_space"] + ids_length] = pos_ids
-                bin["used_space"] += ids_length
-                bin["remaining_space"] -= ids_length
-                break
-        else:  # no break
+        if use_flash:
+            pos_ids = original_position_ids[original_idx]
+            assert pos_ids.numel() == ids_length
+
+        added = False
+        if not use_flash:
+            for bin in bins:
+                if bin["remaining_space"] >= ids_length:
+                    # ids fits into this bin. Add it and update remaining_space.
+                    bin["input_ids"][bin["used_space"]:bin["used_space"] + ids_length] = ids
+                    bin["labels"][bin["used_space"]:bin["used_space"] + ids_length] = labels
+                    bin["attention_mask"][bin["used_space"]:bin["used_space"] + ids_length] = masks
+                    if use_flash:
+                        bin["position_ids"][bin["used_space"]:bin["used_space"] + ids_length] = pos_ids
+                    bin["used_space"] += ids_length
+                    bin["remaining_space"] -= ids_length
+                    added = True
+                    break
+        if not added:  # no break
             # ids didn't fit into any bin. Create a new bin.
             bin_input_ids = torch.full((max_tokens,), tokenizer.pad_token_id, dtype=torch.long)
             bin_labels = torch.full((max_tokens,), IGNORE_TOKEN_ID, dtype=torch.long)
             bin_attention_mask = torch.full((max_tokens,), 0, dtype=torch.long)
-            bin_position_ids = torch.full((max_tokens,), 0, dtype=torch.long)
             bin_input_ids[:ids_length] = ids
             bin_labels[:ids_length] = labels
             bin_attention_mask[:ids_length] = masks
-            bin_position_ids[:ids_length] = pos_ids
-            bins.append({
+            if use_flash:
+                bin_position_ids = torch.full((max_tokens,), 0, dtype=torch.long)
+                bin_position_ids[:ids_length] = pos_ids
+            new_bin = {
                 "input_ids": bin_input_ids,
                 "labels": bin_labels,
                 "attention_mask": bin_attention_mask,
-                "position_ids": bin_position_ids,
                 "used_space": ids_length,
                 "remaining_space": max_tokens - ids_length
-            })
+            }
+            if use_flash:
+                new_bin["position_ids"] = bin_position_ids
+            bins.append(new_bin)
 
     ret = {
         "input_ids": [bin["input_ids"].tolist() for bin in bins],
         "labels": [bin["labels"].tolist() for bin in bins],
         "attention_mask": [bin["attention_mask"].tolist() for bin in bins],
-        "position_ids": [bin["position_ids"].tolist() for bin in bins],
     }
+    if use_flash:
+        "position_ids": [bin["position_ids"].tolist() for bin in bins],
     return ret
 
 
@@ -442,7 +388,7 @@ def load_tokenized_prepared_datasets_local_stream(
                         "unhandled dataset load: local path exists, but is neither a directory or a file"
                     )
         dataset = concatenate_datasets(datasets)
-        finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len)
+        finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len, cfg.flash_attention)
         dataset = dataset.map(
             finalize_ds,
             batched=True,
@@ -480,7 +426,7 @@ def load_tokenized_prepared_datasets_local_stream(
             split=None,
         )
         ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
-        finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len)
+        finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len, cfg.flash_attention)
         dataset = ds.map(
             finalize_ds,
             batched=True,
