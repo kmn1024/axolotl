@@ -133,7 +133,7 @@ def load_model(
             from axolotl.monkeypatch.stablelm_attn_hijack_flash import (
                 replace_stablelm_attn_with_flash_attn,
             )
-
+            LOG.info("Calling replace_stablelm_attn_with_flash_attn")
             replace_stablelm_attn_with_flash_attn(cfg.base_model)
 
     if cfg.is_llama_derived_model and cfg.flash_attention and cfg.sample_packing:
@@ -177,7 +177,7 @@ def load_model(
             replace_mistral_attn_with_flash_attn,
         )
 
-        LOG.info("patching with flash attention")
+        LOG.info("Calling replace_mistral_attn_with_flash_attn")
         replace_mistral_attn_with_flash_attn(packed=cfg.sample_packing)
 
     if cfg.is_llama_derived_model and cfg.noisy_embedding_alpha:
