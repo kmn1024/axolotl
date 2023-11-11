@@ -56,7 +56,7 @@ early_stopping_patience:
 resume_from_checkpoint:
 local_rank:
 xformers_attention:
-flash_attention: true
+flash_attention: false
 
 max_steps: 1430  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * GPUs) = 5847355 / (4096*2*2)
 logging_steps: 4  # max_steps * 0.002
