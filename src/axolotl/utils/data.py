@@ -317,7 +317,7 @@ def pack_and_pad_ffd(tokenizer: PreTrainedTokenizerBase, max_tokens: int, use_fl
         "attention_mask": [bin["attention_mask"].tolist() for bin in bins],
     }
     if use_flash:
-        "position_ids": [bin["position_ids"].tolist() for bin in bins],
+        ret["position_ids"] = [bin["position_ids"].tolist() for bin in bins]
     return ret
 
 
