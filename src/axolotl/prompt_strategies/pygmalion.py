@@ -130,6 +130,7 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
                 mask = IGNORE_TOKEN_ID
             else:
                 assert key == 'input_ids'
+                mask = None
 
             for i in range(0, len(val), INCREMENT):
                 chunked_result[key].append(val[i : i + self.sequence_len])
