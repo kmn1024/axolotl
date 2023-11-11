@@ -210,10 +210,15 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
         )
 
     if is_streaming:
+        def add_position_ids(sample):
+            sample["position_ids"] = torch.arange(len(sample["input_ids"]))
+            return sample
+
         map_kwargs = {}
         if ds_strategy.supports_batched:
             map_kwargs["batched"] = True
             map_kwargs["batch_size"] = 100
+        ds = ds.map(add_position_ids, **map_kwargs)
         return ds.map(
             ds_strategy.tokenize_prompt,
             remove_columns=cfg.dataset_columns,
