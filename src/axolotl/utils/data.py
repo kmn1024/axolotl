@@ -220,7 +220,13 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
             **map_kwargs,
         )
         def add_position_ids(sample):
-            sample["position_ids"] = torch.arange(len(sample["input_ids"]))
+            if isinstance(sample["input_ids"][0], list):
+                sample["position_ids"] = []
+                for input_ids in sample["input_ids"]:
+                    sample["position_ids"].append(list(range(len(input_ids))))
+            else:
+                assert isinstance(sample["input_ids"][0], int), sample["input_ids"]
+                sample["position_ids"] = list(range(len(sample["input_ids"])))
             return sample
         return ds.map(add_position_ids, **map_kwargs)
     else:

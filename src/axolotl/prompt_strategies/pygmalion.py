@@ -116,8 +116,8 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
             else:
                 assert False, f"unknown role in conversation: {role}"
         
-        if current_len <= self.sequence_len:
-            return result
+        # if current_len <= self.sequence_len:
+        #     return result
         
         INCREMENT = int(0.7 * self.sequence_len)
         chunked_result, _ = tokenize_prompt_default()
@@ -135,7 +135,7 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
             for i in range(0, len(val), INCREMENT):
                 chunked_result[key].append(val[i : i + self.sequence_len])
                 if mask and previous_end > 0:
-                    mask_range = previous_end - i
+                    mask_range = min(previous_end - i, len(chunked_result[key][-1]))
                     assert mask_range > 0, f'{previous_end} : {i} from {len(val)}'
                     chunked_result[key][-1][:mask_range] = [mask]*mask_range
                 previous_end = i + self.sequence_len
