@@ -225,7 +225,7 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
         return ds_wrapper
 
 
-def pad_only(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: Dict[str, List[int]]):
+def pad_only(tokenizer: PreTrainedTokenizerBase, max_tokens: int, pad_left: bool, res: Dict[str, List[int]]):
     def to_tensor_list(input):
         output = []
         for seq in input:
@@ -257,9 +257,15 @@ def pad_only(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: Dict[str,
         if ids_length > max_tokens:
             LOG.warning(f'pack_only skip long input: {ids.numel()} > {max_tokens}')
             continue
-        buffer_input_ids[:ids_length] = ids
-        buffer_labels[:ids_length] = label
-        buffer_attention_mask[:ids_length] = mask
+        if pad_left:
+            start_index = max_tokens - ids_length
+            buffer_input_ids[start_index:] = ids
+            buffer_labels[start_index:] = label
+            buffer_attention_mask[start_index:] = mask
+        else:
+            buffer_input_ids[:ids_length] = ids
+            buffer_labels[:ids_length] = label
+            buffer_attention_mask[:ids_length] = mask
         new_input_ids.append(buffer_input_ids.clone())
         new_labels.append(buffer_labels.clone())
         new_attention_mask.append(buffer_attention_mask.clone())
@@ -276,7 +282,7 @@ def pad_only(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: Dict[str,
 
 
 # Pack with First Fit Decreasing.
-def pack_and_pad_ffd(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: Dict[str, List[int]]):
+def pack_and_pad_ffd(tokenizer: PreTrainedTokenizerBase, max_tokens: int, pad_left: bool, res: Dict[str, List[int]]):
     def to_flattened_list(input):
         output = []
         for seq in input:
@@ -312,9 +318,10 @@ def pack_and_pad_ffd(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: D
         for bin in bins:
             if bin["remaining_space"] >= ids_length:
                 # ids fits into this bin. Add it and update remaining_space.
-                bin["input_ids"][bin["used_space"]:bin["used_space"] + ids_length] = ids
-                bin["labels"][bin["used_space"]:bin["used_space"] + ids_length] = labels
-                bin["attention_mask"][bin["used_space"]:bin["used_space"] + ids_length] = masks
+                start_index = bin["remaining_space"] - ids_length if pad_left else bin["used_space"]
+                bin["input_ids"][start_index:start_index + ids_length] = ids
+                bin["labels"][start_index:start_index + ids_length] = labels
+                bin["attention_mask"][start_index:start_index + ids_length] = masks
                 bin["used_space"] += ids_length
                 bin["remaining_space"] -= ids_length
                 break
@@ -323,9 +330,10 @@ def pack_and_pad_ffd(tokenizer: PreTrainedTokenizerBase, max_tokens: int, res: D
             bin_input_ids = torch.full((max_tokens,), tokenizer.pad_token_id, dtype=torch.long)
             bin_labels = torch.full((max_tokens,), IGNORE_TOKEN_ID, dtype=torch.long)
             bin_attention_mask = torch.full((max_tokens,), 0, dtype=torch.long)
-            bin_input_ids[:ids_length] = ids
-            bin_labels[:ids_length] = labels
-            bin_attention_mask[:ids_length] = masks
+            start_index = max_tokens - ids_length if pad_left else 0
+            bin_input_ids[start_index:start_index + ids_length] = ids
+            bin_labels[start_index:start_index + ids_length] = labels
+            bin_attention_mask[start_index:start_index + ids_length] = masks
             new_bin = {
                 "input_ids": bin_input_ids,
                 "labels": bin_labels,
@@ -410,7 +418,8 @@ def load_tokenized_prepared_datasets_local_stream(
                         "unhandled dataset load: local path exists, but is neither a directory or a file"
                     )
         dataset = concatenate_datasets(datasets)
-        finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len)
+        pad_left = cfg.is_mistral_derived_model
+        finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len, pad_left)
         dataset = dataset.map(
             finalize_ds,
             batched=True,
@@ -453,10 +462,12 @@ def load_tokenized_prepared_datasets_local_stream(
             # The monkeypatches needed for flash_attention to work with packing doesn't work
             # for our custom FFD packing yet, so we will rely on the default flash_attention logic
             # from huggingface, which expects unpacked examples.
-            finalize_ds = functools.partial(pad_only, tokenizer, cfg.sequence_len)
+            pad_left = cfg.is_mistral_derived_model
+            finalize_ds = functools.partial(pad_only, tokenizer, cfg.sequence_len, pad_left)
         else:
             # We do our custom FFD packing.
-            finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len)
+            pad_left = cfg.is_mistral_derived_model
+            finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len, pad_left)
         dataset = ds.map(
             finalize_ds,
             batched=True,
