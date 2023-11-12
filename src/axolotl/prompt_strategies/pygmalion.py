@@ -124,12 +124,10 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
         # Else, need to chunk into multiple examples. The overlapping tokens must be masked.
         previous_end = 0
         for key, val in result.items():
-            if key == 'attention_mask':
-                mask = 0
-            elif key == 'labels':
+            if key == 'labels':
                 mask = IGNORE_TOKEN_ID
             else:
-                assert key == 'input_ids'
+                assert key in ['input_ids', 'attention_mask'], key
                 mask = None
 
             for i in range(0, len(val), INCREMENT):
