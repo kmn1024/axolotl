@@ -82,7 +82,7 @@ def load_tokenizer(cfg):
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     # Mistral's official FA implementation requires left padding
-    if cfg.is_mistral_derived_model and cfg.flash_attention and not (cfg.sample_packing or cfg.local_streaming_datasets):
+    if cfg.is_mistral_derived_model and cfg.flash_attention and not cfg.sample_packing:
         tokenizer.padding_side = "left"
 
     if cfg.special_tokens:
@@ -129,7 +129,7 @@ def load_model(
         hasattr(model_config, "model_type")
         and model_config.model_type == "stablelm_epoch"
     ):
-        if cfg.flash_attention and (cfg.sample_packing or cfg.local_streaming_datasets):
+        if cfg.flash_attention and cfg.sample_packing:
             from axolotl.monkeypatch.stablelm_attn_hijack_flash import (
                 replace_stablelm_attn_with_flash_attn,
             )
@@ -172,7 +172,7 @@ def load_model(
         # Note: This might overwrite previous additional_special_tokens
         tokenizer.add_special_tokens({"additional_special_tokens": [MEM_TOKEN]})
 
-    if cfg.is_mistral_derived_model and cfg.flash_attention and (cfg.sample_packing or cfg.local_streaming_datasets):
+    if cfg.is_mistral_derived_model and cfg.flash_attention and cfg.sample_packing:
         from axolotl.monkeypatch.mistral_attn_hijack_flash import (
             replace_mistral_attn_with_flash_attn,
         )
@@ -246,7 +246,7 @@ def load_model(
             bnb_4bit_quant_type="nf4",
         )
     # sample packing uses custom FA2 patch
-    if cfg.flash_attention and not cfg.sample_packing and not cfg.local_streaming_datasets:
+    if cfg.flash_attention and not cfg.sample_packing:
         if (
             cfg.is_llama_derived_model
             or cfg.is_falcon_derived_model
