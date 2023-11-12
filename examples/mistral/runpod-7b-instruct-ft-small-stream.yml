@@ -80,6 +80,10 @@ debug:
 deepspeed: deepspeed/zero2.json
 fsdp:
 fsdp_config:
+special_tokens:
+  bos_token: "<s>"
+  eos_token: "<|im_end|>"
+  unk_token: "<unk>"
 tokens:
   - "<|system|>"
   - "<|user|>"

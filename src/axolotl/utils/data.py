@@ -252,6 +252,7 @@ def pad_only(tokenizer: PreTrainedTokenizerBase, max_tokens: int, pad_left: bool
     buffer_attention_mask = torch.full((max_tokens,), 0, dtype=torch.long)
 
     for ids, label, mask in zip(input_ids, labels, attention_mask):
+        assert mask[-1] == 1, mask
         # Drop entries that are too long.
         ids_length = ids.numel()
         if ids_length > max_tokens:
@@ -272,6 +273,9 @@ def pad_only(tokenizer: PreTrainedTokenizerBase, max_tokens: int, pad_left: bool
         buffer_input_ids.fill_(tokenizer.pad_token_id)
         buffer_labels.fill_(IGNORE_TOKEN_ID)
         buffer_attention_mask.fill_(0)
+
+    for seq in new_attention_mask:
+        assert seq[-1] == 1, seq
 
     ret = {
         "input_ids": [seq.tolist() for seq in new_input_ids],
@@ -419,7 +423,10 @@ def load_tokenized_prepared_datasets_local_stream(
                     )
         dataset = concatenate_datasets(datasets)
         pad_left = cfg.is_mistral_derived_model
-        finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len, pad_left)
+        if cfg.flash_attention:
+            finalize_ds = functools.partial(pad_only, tokenizer, cfg.sequence_len, pad_left)
+        else:
+            finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len, pad_left)
         dataset = dataset.map(
             finalize_ds,
             batched=True,
@@ -458,15 +465,14 @@ def load_tokenized_prepared_datasets_local_stream(
         )
         ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
         assert not cfg.sample_packing, f'In local_streaming_datasets mode, we have our own sample_packing flow'
+        pad_left = cfg.is_mistral_derived_model
         if cfg.flash_attention:
             # The monkeypatches needed for flash_attention to work with packing doesn't work
             # for our custom FFD packing yet, so we will rely on the default flash_attention logic
             # from huggingface, which expects unpacked examples.
-            pad_left = cfg.is_mistral_derived_model
             finalize_ds = functools.partial(pad_only, tokenizer, cfg.sequence_len, pad_left)
         else:
             # We do our custom FFD packing.
-            pad_left = cfg.is_mistral_derived_model
             finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len, pad_left)
         dataset = ds.map(
             finalize_ds,
