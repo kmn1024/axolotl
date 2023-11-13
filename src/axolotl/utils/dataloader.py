@@ -336,7 +336,7 @@ class StreamingMultipackDistributedDataloader:
 
         # Grab a bunch of examples from dataset.
         examples = []
-        PROCESS_CHUNK_SIZE = 128
+        PROCESS_CHUNK_SIZE = 256
         features = None
         for ex in self.dataset:
             if features is None:

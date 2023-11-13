@@ -51,6 +51,10 @@ class AxolotlTrainingArguments(TrainingArguments):
     Extend the base TrainingArguments for axolotl helpers
     """
 
+    local_streaming_datasets: bool = field(
+        default=False,
+        metadata={"help": "Whether datasets are streaming, from local files."},
+    )
     lr_quadratic_warmup: bool = field(
         default=False,
         metadata={"help": "Use quadratic warmup for cosine scheduling."},
@@ -190,10 +194,9 @@ class AxolotlTrainer(Trainer):
             print(f'split_dataset_by_node shards: {self.train_dataset.n_shards}')
             return self.accelerator.prepare(
                 StreamingMultipackDistributedDataloader(
-                    self.train_dataset,
-                    batch_size=self._train_batch_size,
-                    seq_max_length=self.args.max_seq_length,
-                    collate_fn=self.data_collator,
+                    self.train_dataset, self.data_collator,
+                    self.args.max_seq_length, self._train_batch_size,
+                    self.args.sample_packing_seq_len_multiplier
                 )
             )
         else:
@@ -472,7 +475,10 @@ class HFCausalTrainerBuilder(TrainerBuilderBase):
         # deepspeed
         if self.cfg.deepspeed:
             training_arguments_kwargs["deepspeed"] = self.cfg.deepspeed
-
+        if self.cfg.local_streaming_datasets is not None:
+            training_arguments_kwargs[
+                "local_streaming_datasets"
+            ] = self.cfg.local_streaming_datasets
         if self.cfg.lr_quadratic_warmup is not None:
             training_arguments_kwargs[
                 "lr_quadratic_warmup"
