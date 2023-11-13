@@ -338,18 +338,24 @@ class StreamingMultipackDistributedDataloader:
 
         # Grab a bunch of examples from dataset.
         examples = []
-        PROCESS_CHUNK_SIZE = 256
         features = None
-        for _ in range(PROCESS_CHUNK_SIZE):
+        tokens_per_batch = self.seq_max_length * self.sample_packing_seq_len_multiplier
+        tokens_this_run = 0
+        while True:
             try:
                 ex = next(self.dataset_iter)  # Use the iterator here
             except StopIteration:
-                break
+                LOG.info("Resetting iterator!")
+                self.dataset_iter = iter(self.dataset)
+                continue
             if features is None:
                 features = ex.keys()
             else:
                 assert features == ex.keys()
+            tokens_this_run += (ex['position_ids'][-1] + 1)
             examples.append(ex)
+            if tokens_this_run >= (tokens_per_batch * 4.5):  # More examples for better packing.
+                break
         if not examples:
             return [], [], []
 
@@ -362,7 +368,7 @@ class StreamingMultipackDistributedDataloader:
             lengths_cumsum=lengths_cumsum,
             rank=self.rank,
             # c=self.batch_max_length,
-            c=self.seq_max_length * self.sample_packing_seq_len_multiplier,
+            c=tokens_per_batch,
             n=self.num_replicas,
         )
         return batches, examples, features
