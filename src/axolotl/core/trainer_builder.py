@@ -34,7 +34,7 @@ from axolotl.utils.callbacks import (
     log_prediction_callback_factory,
 )
 from axolotl.utils.collators import DataCollatorForSeq2Seq
-from axolotl.utils.dataloader import MultipackDistributedDataloader
+from axolotl.utils.dataloader import MultipackDistributedDataloader, StreamingMultipackDistributedDataloader
 from axolotl.utils.schedulers import get_cosine_schedule_with_quadratic_warmup
 
 try:
@@ -167,8 +167,8 @@ class AxolotlTrainer(Trainer):
             )
         return super()._get_eval_sampler(eval_dataset)
 
-    def get_train_dataloader(self) -> Union[DataLoader, MultipackDistributedDataloader]:
-        if self.args.sample_packing:
+    def get_train_dataloader(self) -> Union[DataLoader, MultipackDistributedDataloader, StreamingMultipackDistributedDataloader]:
+        if self.args.sample_packing and not self.args.local_streaming_datasets:
             train_sampler = self._get_train_sampler()
             return self.accelerator.prepare(
                 MultipackDistributedDataloader(
@@ -182,25 +182,20 @@ class AxolotlTrainer(Trainer):
                     device_count=int(os.environ.get("WORLD_SIZE", 1)),
                 )
             )
-        elif self.args.world_size > 1:
+        elif self.args.sample_packing and self.args.local_streaming_datasets:
             print(f'get_train_dataloader input shards: {self.train_dataset.n_shards}')
             self.train_dataset = split_dataset_by_node(self.train_dataset,
                                                        rank=self.args.process_index,
                                                        world_size=self.args.world_size)
             print(f'split_dataset_by_node shards: {self.train_dataset.n_shards}')
-            dataloader_params = {
-                "batch_size": self._train_batch_size,
-                "collate_fn": self.data_collator,
-                "num_workers": self.args.dataloader_num_workers,
-                "pin_memory": self.args.dataloader_pin_memory,
-                "prefetch_factor": 2,
-            }
-            data_loader = DataLoader(self.train_dataset, **dataloader_params)
-            if has_length(data_loader):
-                print(f'DataLoader length: {len(data_loader)}')
-            else:
-                print('DataLoader no length')
-            return self.accelerator.prepare(data_loader)
+            return self.accelerator.prepare(
+                StreamingMultipackDistributedDataloader(
+                    self.train_dataset,
+                    batch_size=self._train_batch_size,
+                    seq_max_length=self.args.max_seq_length,
+                    collate_fn=self.data_collator,
+                )
+            )
         else:
             return super().get_train_dataloader()
 

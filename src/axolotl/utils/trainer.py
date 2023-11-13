@@ -147,6 +147,41 @@ def process_datasets_for_packing(cfg, train_dataset, eval_dataset, tokenizer):
 
     return train_dataset, eval_dataset
 
+# Exact copy of process_datasets_for_packing, but suitable for streaming datasets.
+def streaming_process_datasets_for_packing(cfg, train_dataset, eval_dataset, tokenizer):
+    drop_long = partial(drop_long_seq, sequence_len=cfg.sequence_len)
+    train_dataset = train_dataset.filter(drop_long)
+    if eval_dataset:
+        eval_dataset = eval_dataset.filter(
+            drop_long
+        )
+
+    if cfg.group_by_length:
+        train_dataset = train_dataset.map(
+            add_length
+        )
+
+    if cfg.sample_packing:
+        train_dataset = train_dataset.map(
+            add_position_ids
+        )
+        if cfg.eval_sample_packing is not False:
+            if eval_dataset:
+                eval_dataset = eval_dataset.map(
+                    add_position_ids
+                )
+
+    # Phi doesn't want the attention_mask feature when training
+    if "CodeGenTokenizer" in tokenizer.__class__.__name__ or (
+        cfg.is_mistral_derived_model and cfg.flash_attention
+    ):
+        train_dataset = train_dataset.remove_columns("attention_mask")
+        if eval_dataset:
+            eval_dataset = eval_dataset.remove_columns("attention_mask")
+
+    return train_dataset, eval_dataset
+
+
 
 def calculate_total_num_steps(cfg, train_dataset, tokenizer):
     if cfg.sample_packing:

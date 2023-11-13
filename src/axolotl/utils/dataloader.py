@@ -300,3 +300,101 @@ class MultipackDistributedDataloader:
 
     def efficiency(self):
         return self.eff_total_used / self.eff_total_slots
+    
+
+
+class StreamingMultipackDistributedDataloader:
+    """Unpadded data loading using Multipack.
+    Adapted from https://github.com/imoneoi/openchat/blob/v3_fix_mle_loss/ochat/training_deepspeed/multipack_dataloader.py
+    Approximate (at most ~1.22x) the optimal solution of the identical-machines scheduling problem, which is NP-hard.
+    """
+
+    def __init__(
+        self,
+        dataset: Any,
+        collate_fn: Callable,
+        seq_max_length: int = 2048,
+        batch_size: int = 1,
+        sample_packing_seq_len_multiplier: int = 1,
+    ):
+        # Dataset
+        self.dataset = dataset
+        assert batch_size % sample_packing_seq_len_multiplier == 0
+        assert batch_size >= sample_packing_seq_len_multiplier
+        self.batch_size = batch_size
+        self.sample_packing_seq_len_multiplier = sample_packing_seq_len_multiplier
+        self.seq_max_length = seq_max_length
+        self.batch_max_length = batch_size * seq_max_length
+        self.collate_fn = collate_fn
+        # What are these for?
+        self.num_replicas = 1
+        self.rank = 0
+
+    def generate_batches_chunk(self):
+        # No sampling in streaming; we expect dataset to be sharded and divided amongst nodes.
+        LOG.info("generating packed batches")
+
+        # Grab a bunch of examples from dataset.
+        examples = []
+        PROCESS_CHUNK_SIZE = 128
+        features = None
+        for ex in self.dataset:
+            if features is None:
+                features = ex.keys()
+            else:
+                assert features == ex.keys()
+            examples.append(ex)
+            if len(examples) == PROCESS_CHUNK_SIZE:
+                break
+
+        lengths = np.array([ex['position_ids'][-1] + 1 for ex in examples])
+        assert isinstance(lengths, np.ndarray)
+        lengths_cumsum = np.cumsum(lengths)
+
+        batches, totseqs, total_used, total_slots = allocate(
+            lengths=lengths,
+            lengths_cumsum=lengths_cumsum,
+            rank=self.rank,
+            # c=self.batch_max_length,
+            c=self.seq_max_length * self.sample_packing_seq_len_multiplier,
+            n=self.num_replicas,
+        )
+        return batches, examples, features
+
+    def __iter__(self):
+        while True:
+            all_batches, examples, features = self.generate_batches_chunk()
+            print(f'StreamingMultipackDistributedDataloader: batches={len(all_batches)}, example={len(examples)}, features={features}')
+            # Discard last.
+            if len(examples) < self.sample_packing_seq_len_multiplier:
+                return
+            
+            print(examples[0])
+            for batches in chunk(
+                all_batches, self.batch_size // self.sample_packing_seq_len_multiplier
+            ):
+                chunked_data = []
+                attn_mask_cum_idx = 0
+                for batch in batches:
+                    concatenated = {}
+                    batched_data = [examples[batch_idx] for batch_idx in batch]
+                    for feature in features:
+                        if feature == "length":
+                            continue
+                        if feature == "attention_mask":
+                            arrays = [
+                                (attn_mask_cum_idx + idx + 1) * np.array(item[feature])
+                                for idx, item in enumerate(batched_data)
+                                if feature in item
+                            ]
+                            attn_mask_cum_idx += len(batched_data)
+                            concatenated[feature] = np.concatenate(arrays)
+                        else:
+                            arrays = [
+                                np.array(item[feature])
+                                for item in batched_data
+                                if feature in item
+                            ]
+                            concatenated[feature] = np.concatenate(arrays)
+                    chunked_data.append(concatenated)
+                yield self.collate_fn(chunked_data)

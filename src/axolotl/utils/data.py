@@ -52,7 +52,10 @@ from axolotl.utils.distributed import is_main_process, zero_first
 from axolotl.utils.trainer import (
     calculate_total_num_steps,
     process_datasets_for_packing,
+    streaming_process_datasets_for_packing,
 )
+
+from axolotl.utils.dataloader import MultipackDistributedDataloader, StreamingMultipackDistributedDataloader
 
 LOG = logging.getLogger("axolotl")
 
@@ -70,6 +73,7 @@ def prepare_dataset(cfg, tokenizer):
         eval_dataset = load_tokenized_prepared_datasets_local_stream(tokenizer, cfg, cfg.eval_datasets, is_eval=True) if cfg.eval_datasets else None
         if eval_dataset:
             print(f'Eval examples: {len(eval_dataset)}')
+        train_dataset, eval_dataset = streaming_process_datasets_for_packing(cfg, train_dataset, eval_dataset, tokenizer)
         return train_dataset, eval_dataset, cfg.max_steps
     elif not cfg.pretraining_dataset:
         with zero_first(is_main_process()):
@@ -213,7 +217,7 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
         map_kwargs = {}
         if ds_strategy.supports_batched:
             map_kwargs["batched"] = True
-            map_kwargs["batch_size"] = 100
+            map_kwargs["batch_size"] = 8
         ds = ds.map(
             ds_strategy.tokenize_prompt,
             remove_columns=cfg.dataset_columns,
@@ -223,136 +227,6 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
     else:
         ds_wrapper = TokenizedPromptDataset(ds_strategy, ds, remove_columns=None)
         return ds_wrapper
-
-
-def pad_only(tokenizer: PreTrainedTokenizerBase, max_tokens: int, pad_left: bool, res: Dict[str, List[int]]):
-    def to_tensor_list(input):
-        output = []
-        for seq in input:
-            assert isinstance(seq, list), f'Unsupported input: {seq}'
-            if isinstance(seq[0], int):
-                output.append(torch.tensor(seq))
-            elif isinstance(seq[0], list):
-                output += to_tensor_list(seq)
-            else:
-                assert False, f'Unsupported sub-input: {seq[0]}'
-        return output
-
-    IGNORE_TOKEN_ID = -100  # Copied from prompt_strategies
-    input_ids = to_tensor_list(res["input_ids"])
-    labels = to_tensor_list(res["labels"])
-    attention_mask = to_tensor_list(res["attention_mask"])
-
-    # Concatenate tokens so that their lengths are less than max_tokens
-    new_input_ids = []
-    new_labels = []
-    new_attention_mask = []
-    buffer_input_ids = torch.full((max_tokens,), tokenizer.pad_token_id, dtype=torch.long)
-    buffer_labels = torch.full((max_tokens,), IGNORE_TOKEN_ID, dtype=torch.long)
-    buffer_attention_mask = torch.full((max_tokens,), 0, dtype=torch.long)
-
-    for ids, label, mask in zip(input_ids, labels, attention_mask):
-        assert mask[-1] == 1, mask
-        # Drop entries that are too long.
-        ids_length = ids.numel()
-        if ids_length > max_tokens:
-            LOG.warning(f'pack_only skip long input: {ids.numel()} > {max_tokens}')
-            continue
-        if pad_left:
-            start_index = max_tokens - ids_length
-            buffer_input_ids[start_index:] = ids
-            buffer_labels[start_index:] = label
-            buffer_attention_mask[start_index:] = mask
-        else:
-            buffer_input_ids[:ids_length] = ids
-            buffer_labels[:ids_length] = label
-            buffer_attention_mask[:ids_length] = mask
-        new_input_ids.append(buffer_input_ids.clone())
-        new_labels.append(buffer_labels.clone())
-        new_attention_mask.append(buffer_attention_mask.clone())
-        buffer_input_ids.fill_(tokenizer.pad_token_id)
-        buffer_labels.fill_(IGNORE_TOKEN_ID)
-        buffer_attention_mask.fill_(0)
-
-    for seq in new_attention_mask:
-        assert seq[-1] == 1, seq
-
-    ret = {
-        "input_ids": [seq.tolist() for seq in new_input_ids],
-        "labels": [seq.tolist() for seq in new_labels],
-        "attention_mask": [seq.tolist() for seq in new_attention_mask],
-    }
-    return ret
-
-
-# Pack with First Fit Decreasing.
-def pack_and_pad_ffd(tokenizer: PreTrainedTokenizerBase, max_tokens: int, pad_left: bool, res: Dict[str, List[int]]):
-    def to_flattened_list(input):
-        output = []
-        for seq in input:
-            assert isinstance(seq, list), f'Unsupported input: {seq}'
-            if isinstance(seq[0], int):
-                output.append(seq)
-            elif isinstance(seq[0], list):
-                output += to_flattened_list(seq)
-            else:
-                assert False, f'Unsupported sub-input: {seq[0]}'
-        return output
-
-    IGNORE_TOKEN_ID = -100  # Copied from prompt_strategies
-    flattened_input_ids = to_flattened_list(res["input_ids"])
-    sorted_input_ids_idx = [(idx, torch.tensor(ids)) for idx, ids in sorted(enumerate(flattened_input_ids), key=lambda x:len(x[1]), reverse=True)]
-    original_labels = [torch.tensor(l) for l in to_flattened_list(res["labels"])]
-    original_attention_mask = [torch.tensor(l) for l in to_flattened_list(res["attention_mask"])]
-
-    # Concatenate tokens so that their lengths are less than max_tokens
-    bins = []
-     # Try to fit ids into each bin.
-    for original_idx, ids in sorted_input_ids_idx:
-        ids_length = ids.numel()
-        if ids_length > max_tokens:
-            LOG.warning(f'pack_and_pad skip long input: {ids.numel()} > {max_tokens}')
-            continue
-
-        labels = original_labels[original_idx]
-        assert labels.numel() == ids_length
-        masks = original_attention_mask[original_idx]
-        assert masks.numel() == ids_length
-
-        for bin in bins:
-            if bin["remaining_space"] >= ids_length:
-                # ids fits into this bin. Add it and update remaining_space.
-                start_index = bin["remaining_space"] - ids_length if pad_left else bin["used_space"]
-                bin["input_ids"][start_index:start_index + ids_length] = ids
-                bin["labels"][start_index:start_index + ids_length] = labels
-                bin["attention_mask"][start_index:start_index + ids_length] = masks
-                bin["used_space"] += ids_length
-                bin["remaining_space"] -= ids_length
-                break
-        else:  # no break
-            # ids didn't fit into any bin. Create a new bin.
-            bin_input_ids = torch.full((max_tokens,), tokenizer.pad_token_id, dtype=torch.long)
-            bin_labels = torch.full((max_tokens,), IGNORE_TOKEN_ID, dtype=torch.long)
-            bin_attention_mask = torch.full((max_tokens,), 0, dtype=torch.long)
-            start_index = max_tokens - ids_length if pad_left else 0
-            bin_input_ids[start_index:start_index + ids_length] = ids
-            bin_labels[start_index:start_index + ids_length] = labels
-            bin_attention_mask[start_index:start_index + ids_length] = masks
-            new_bin = {
-                "input_ids": bin_input_ids,
-                "labels": bin_labels,
-                "attention_mask": bin_attention_mask,
-                "used_space": ids_length,
-                "remaining_space": max_tokens - ids_length
-            }
-            bins.append(new_bin)
-
-    ret = {
-        "input_ids": [bin["input_ids"].tolist() for bin in bins],
-        "labels": [bin["labels"].tolist() for bin in bins],
-        "attention_mask": [bin["attention_mask"].tolist() for bin in bins],
-    }
-    return ret
 
 
 def load_tokenized_prepared_datasets_local_stream(
@@ -408,30 +282,15 @@ def load_tokenized_prepared_datasets_local_stream(
                     for dir_filepath in dir_filepaths:
                         assert os.path.isfile(dir_filepath), dir_filepath
                         file_ds_name = d.name + '_' + os.path.basename(dir_filepath)
-                        ds = load_streaming_ds(d.ds_type, file_ds_name, dir_filepath)
-                        wrapped_ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
-                        if wrapped_ds:
-                            datasets.append(wrapped_ds)
+                        datasets.append((d, load_streaming_ds(d.ds_type, file_ds_name, dir_filepath)))
                 elif local_path.is_file():
-                    ds = load_streaming_ds(d.ds_type, d.name, d.path)
-                    wrapped_ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
-                    if wrapped_ds:
-                        datasets.append(wrapped_ds)
+                    datasets.append((d, load_streaming_ds(d.ds_type, d.name, d.path)))
                 else:
                     raise ValueError(
                         "unhandled dataset load: local path exists, but is neither a directory or a file"
                     )
+        datasets = [postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True) for d, ds in datasets]
         dataset = concatenate_datasets(datasets)
-        pad_left = cfg.is_mistral_derived_model
-        if cfg.flash_attention:
-            finalize_ds = functools.partial(pad_only, tokenizer, cfg.sequence_len, pad_left)
-        else:
-            finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len, pad_left)
-        dataset = dataset.map(
-            finalize_ds,
-            batched=True,
-            batch_size=64,
-        )
     else:
         # pylint: disable=invalid-name
         datafiles = []
@@ -463,23 +322,8 @@ def load_tokenized_prepared_datasets_local_stream(
             streaming=True,
             split=None,
         )
-        ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
-        assert not cfg.sample_packing, f'In local_streaming_datasets mode, we have our own sample_packing flow'
-        pad_left = cfg.is_mistral_derived_model
-        if cfg.flash_attention:
-            # The monkeypatches needed for flash_attention to work with packing doesn't work
-            # for our custom FFD packing yet, so we will rely on the default flash_attention logic
-            # from huggingface, which expects unpacked examples.
-            finalize_ds = functools.partial(pad_only, tokenizer, cfg.sequence_len, pad_left)
-        else:
-            # We do our custom FFD packing.
-            finalize_ds = functools.partial(pack_and_pad_ffd, tokenizer, cfg.sequence_len, pad_left)
-        dataset = ds.map(
-            finalize_ds,
-            batched=True,
-            batch_size=64,
-        )
-        print(f'Training data shards: {ds.n_shards}')
+        dataset = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
+        print(f'Training data shards: {dataset.n_shards}')
     return dataset
 
 
