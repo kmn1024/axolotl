@@ -376,7 +376,7 @@ class StreamingMultipackDistributedDataloader:
     def __iter__(self):
         while True:
             all_batches, examples, features = self.generate_batches_chunk()
-            LOG.info(f'StreamingMultipackDistributedDataloader: batches={len(all_batches)}, example={len(examples)}, features={features}')
+            LOG.info(f'StreamingMultipackDistributedDataloader: batches={len(all_batches)}, example={len(examples)}')
             # Discard last.
             if len(examples) < self.sample_packing_seq_len_multiplier:
                 return
