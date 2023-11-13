@@ -369,7 +369,6 @@ class StreamingMultipackDistributedDataloader:
             if len(examples) < self.sample_packing_seq_len_multiplier:
                 return
             
-            print(examples[0])
             for batches in chunk(
                 all_batches, self.batch_size // self.sample_packing_seq_len_multiplier
             ):
