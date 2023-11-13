@@ -212,6 +212,7 @@ class MultipackDistributedDataloader:
             self.sampler.set_epoch(new_epoch)
             LOG.info(f"calling sampler.set_epoch({new_epoch})")
         all_batches, _ = self.generate_batches(set_stats=True)
+        LOG.info(f'MultipackDistributedDataloader: batches={len(all_batches)}')
         features = self.dataset.features.keys()
         len_remaining = self._len_est()
         for batches in chunk(
@@ -319,6 +320,7 @@ class StreamingMultipackDistributedDataloader:
     ):
         # Dataset
         self.dataset = dataset
+        self.dataset_iter = iter(self.dataset)
         assert batch_size % sample_packing_seq_len_multiplier == 0
         assert batch_size >= sample_packing_seq_len_multiplier
         self.batch_size = batch_size
@@ -338,14 +340,18 @@ class StreamingMultipackDistributedDataloader:
         examples = []
         PROCESS_CHUNK_SIZE = 256
         features = None
-        for ex in self.dataset:
+        for _ in range(PROCESS_CHUNK_SIZE):
+            try:
+                ex = next(self.dataset_iter)  # Use the iterator here
+            except StopIteration:
+                break
             if features is None:
                 features = ex.keys()
             else:
                 assert features == ex.keys()
             examples.append(ex)
-            if len(examples) == PROCESS_CHUNK_SIZE:
-                break
+        if not examples:
+            return [], [], []
 
         lengths = np.array([ex['position_ids'][-1] + 1 for ex in examples])
         assert isinstance(lengths, np.ndarray)
@@ -364,7 +370,7 @@ class StreamingMultipackDistributedDataloader:
     def __iter__(self):
         while True:
             all_batches, examples, features = self.generate_batches_chunk()
-            print(f'StreamingMultipackDistributedDataloader: batches={len(all_batches)}, example={len(examples)}, features={features}')
+            LOG.info(f'StreamingMultipackDistributedDataloader: batches={len(all_batches)}, example={len(examples)}, features={features}')
             # Discard last.
             if len(examples) < self.sample_packing_seq_len_multiplier:
                 return
