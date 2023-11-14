@@ -27,6 +27,7 @@ output_dir: /workspace/stablelm-3b-pretrain-full-flash
 
 sequence_len: 4096
 sample_packing: true
+eval_sample_packing: true
 pad_to_sequence_len: true
 
 wandb_project: stablelm-3b-pretrain-full
@@ -41,7 +42,7 @@ micro_batch_size: 12
 optimizer: adamw_torch
 adam_beta1: 0.9
 adam_beta2: 0.95
-adam_epsilon: 0.00001  # 0.00001 for better stability
+adam_epsilon: 0.000001  # 0.00001 for better stability
 lr_scheduler: cosine
 learning_rate: 0.00015
 weight_decay: 0.1

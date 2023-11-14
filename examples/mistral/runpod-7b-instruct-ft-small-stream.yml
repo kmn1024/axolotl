@@ -32,9 +32,10 @@ eval_datasets:
 dataset_prepared_path: /workspace/dataset_prepared_path
 output_dir: /workspace/mistral-7b-instruct
 
-sequence_len: 4096
-sample_packing: false
-pad_to_sequence_len: false
+sequence_len: 8192
+sample_packing: true
+eval_sample_packing: true
+pad_to_sequence_len: true
 
 wandb_project: mistral-7b-instruct-stream-demo1
 wandb_entity:
@@ -43,8 +44,8 @@ wandb_run_id:
 wandb_log_model:
 
 dataloader_num_workers: 1
-gradient_accumulation_steps: 2
-micro_batch_size: 6
+gradient_accumulation_steps: 12
+micro_batch_size: 12
 optimizer: adamw_torch
 adam_beta1: 0.9
 adam_beta2: 0.95
@@ -67,11 +68,11 @@ local_rank:
 xformers_attention:
 flash_attention: true
 
-max_steps: 720  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps*GPUs) = 5847355 / (4096*6*2*2)
-logging_steps: 2  # max_steps * 0.002
-warmup_steps: 20  # max_steps * 0.02
-save_steps: 0.25  # 1 / epochs
-eval_steps: 36
+max_steps: 120  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps*GPUs) = 5847355 / (4096*6*2*2)
+logging_steps: 1  # max_steps * 0.002
+warmup_steps: 2  # max_steps * 0.02
+save_steps: 0.5  # 1 / epochs
+eval_steps: 12
 
 val_set_size: 0
 eval_table_size:
