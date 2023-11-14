@@ -354,7 +354,7 @@ class StreamingMultipackDistributedDataloader:
                 assert features == ex.keys()
             tokens_this_run += (ex['position_ids'][-1] + 1)
             examples.append(ex)
-            if tokens_this_run >= (tokens_per_batch * 4.5):  # More examples for better packing.
+            if tokens_this_run >= (tokens_per_batch * 8.5):  # More examples for better packing.
                 break
         if not examples:
             return [], [], []
