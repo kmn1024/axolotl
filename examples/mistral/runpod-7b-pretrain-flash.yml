@@ -25,7 +25,7 @@ dataset_prepared_path: /workspace/dataset_prepared_path
 output_dir: /workspace/mistral-7b-pretrain
 
 sequence_len: 8192
-sample_packing: true
+sample_packing: true  # Try false? Also disable pad_to_sequence_len
 eval_sample_packing: true
 pad_to_sequence_len: true
 
@@ -43,9 +43,10 @@ adam_beta1: 0.9
 adam_beta2: 0.95
 adam_epsilon: 0.000001  # 0.00001 for better stability
 lr_scheduler: cosine
-learning_rate: 0.00001
+learning_rate: 0.00003  # Official is 0.000025
 weight_decay: 0.1
 max_grad_norm: 1.0
+# Official has dropout = 0.2 (but "didn't make much difference")
 
 train_on_inputs: false
 group_by_length: false
@@ -60,10 +61,10 @@ local_rank:
 xformers_attention:
 flash_attention: true
 
-max_steps: 700  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps*GPUs) = 5847355 / (4096*6*2*2)
+max_steps: 700  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps*GPUs)
 logging_steps: 1  # max_steps * 0.002
-warmup_steps: 7  # max_steps * 0.02
-save_steps: 0.5  # 1 / epochs
+warmup_steps: 35  # Official is 4% of max_steps
+save_steps: 0.05  # 1 / epochs
 eval_steps: 7
 
 val_set_size: 0
@@ -74,8 +75,9 @@ deepspeed: deepspeed/zero2.json
 fsdp:
 fsdp_config:
 special_tokens:
+  pad_token: "<pad>"  # Try "<unk>"?
   bos_token: "<s>"
-  eos_token: "<|im_end|>"
+  eos_token: "</s>"
   unk_token: "<unk>"
 tokens:
   - "<|system|>"
