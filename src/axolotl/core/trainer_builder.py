@@ -59,10 +59,6 @@ class AxolotlTrainingArguments(TrainingArguments):
         default=False,
         metadata={"help": "Use quadratic warmup for cosine scheduling."},
     )
-    min_lr: Optional[float] = field(
-        default=None,
-        metadata={"help": "Floor on the learning rate."}
-    )
     sample_packing: bool = field(
         default=False,
         metadata={"help": "Use sample packing for efficient training."},
@@ -114,24 +110,6 @@ class AxolotlTrainingArguments(TrainingArguments):
     )
 
 
-class MinimumLearningRateScheduler(_LRScheduler):
-    def __init__(self, scheduler, num_training_steps, min_lr):
-        self.scheduler = scheduler
-        self.num_training_steps = num_training_steps
-        self.min_lr = min_lr
-        super(MinimumLearningRateScheduler, self).__init__(scheduler.optimizer, scheduler.last_epoch)
-
-    def get_lr(self):
-        if self.last_epoch >= self.total_steps / 2:
-            return [max(lr, self.min_lr) for lr in self.scheduler.get_lr()]
-        else:
-            return self.scheduler.get_lr()
-
-    def step(self, epoch=None):
-        self.scheduler.step(epoch)
-        super(MinimumLearningRateScheduler, self).step(epoch)
-
-
 class AxolotlTrainer(Trainer):
     """
     Extend the base Trainer for axolotl helpers
@@ -169,9 +147,6 @@ class AxolotlTrainer(Trainer):
                 )
             else:
                 self.lr_scheduler = super().create_scheduler(num_training_steps, optimizer)
-            if self.args.min_lr:
-                print(f'Minimum LR set: {self.args.min_lr}')
-                self.lr_scheduler = MinimumLearningRateScheduler(self.lr_scheduler, num_training_steps, self.args.min_lr)
         return self.lr_scheduler
 
     def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
@@ -510,10 +485,6 @@ class HFCausalTrainerBuilder(TrainerBuilderBase):
             training_arguments_kwargs[
                 "lr_quadratic_warmup"
             ] = self.cfg.lr_quadratic_warmup
-        if self.cfg.min_lr is not None:
-            training_arguments_kwargs[
-                "min_lr"
-            ] = self.cfg.min_lr
 
         if self.cfg.adam_beta1:
             training_arguments_kwargs["adam_beta1"] = self.cfg.adam_beta1
