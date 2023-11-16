@@ -18,7 +18,7 @@ import torch
 import transformers
 from datasets import Dataset
 from datasets.distributed import split_dataset_by_node
-from torch.optim.lr_scheduler import OneCycleLR
+from torch.optim.lr_scheduler import _LRScheduler, OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler, SequentialSampler
 from transformers import EarlyStoppingCallback, Trainer, TrainingArguments
 from transformers.trainer_pt_utils import SequentialDistributedSampler
@@ -58,6 +58,10 @@ class AxolotlTrainingArguments(TrainingArguments):
     lr_quadratic_warmup: bool = field(
         default=False,
         metadata={"help": "Use quadratic warmup for cosine scheduling."},
+    )
+    min_lr: Optional[float] = field(
+        default=None,
+        metadata={"help": "Floor on the learning rate."}
     )
     sample_packing: bool = field(
         default=False,
@@ -110,6 +114,20 @@ class AxolotlTrainingArguments(TrainingArguments):
     )
 
 
+class MinimumLearningRateScheduler(_LRScheduler):
+    def __init__(self, scheduler, min_lr):
+        self.scheduler = scheduler
+        self.min_lr = min_lr
+        super(MinimumLearningRateScheduler, self).__init__(scheduler.optimizer, scheduler.last_epoch)
+
+    def get_lr(self):
+        return [max(lr, self.min_lr) for lr in self.scheduler.get_lr()]
+
+    def step(self, epoch=None):
+        self.scheduler.step(epoch)
+        super(MinimumLearningRateScheduler, self).step(epoch)
+
+
 class AxolotlTrainer(Trainer):
     """
     Extend the base Trainer for axolotl helpers
@@ -146,7 +164,10 @@ class AxolotlTrainer(Trainer):
                     num_training_steps=num_training_steps,
                 )
             else:
-                return super().create_scheduler(num_training_steps, optimizer)
+                self.lr_scheduler = super().create_scheduler(num_training_steps, optimizer)
+            if self.args.min_lr:
+                print(f'Minimum LR set: {self.args.min_lr}')
+                self.lr_scheduler = MinimumLearningRateScheduler(self.lr_scheduler, self.args.min_lr)
         return self.lr_scheduler
 
     def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
@@ -483,6 +504,10 @@ class HFCausalTrainerBuilder(TrainerBuilderBase):
             training_arguments_kwargs[
                 "lr_quadratic_warmup"
             ] = self.cfg.lr_quadratic_warmup
+        if self.cfg.min_lr is not None:
+            training_arguments_kwargs[
+                "min_lr"
+            ] = self.cfg.min_lr
 
         if self.cfg.adam_beta1:
             training_arguments_kwargs["adam_beta1"] = self.cfg.adam_beta1
