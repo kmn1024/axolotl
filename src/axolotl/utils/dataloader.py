@@ -430,8 +430,6 @@ class StreamingMultipackDistributedDataloaderNew:
         self.dataset = dataset
         self.num_workers = num_workers
         self.prefetch_factor = prefetch_factor
-        self.dataset_iter = iter(DataLoader(self.dataset, batch_size=1, collate_fn=lambda x: x[0],
-                                            num_workers=self.num_workers, prefetch_factor=self.prefetch_factor))
         assert batch_size % sample_packing_seq_len_multiplier == 0
         assert batch_size >= sample_packing_seq_len_multiplier
         self.batch_size = batch_size
@@ -442,37 +440,43 @@ class StreamingMultipackDistributedDataloaderNew:
         # What are these for?
         self.num_replicas = 1
         self.rank = 0
+        self._reset_iter()
+
+    def _reset_iter(self):
+        self.dataset_iter = iter(DataLoader(self.dataset, batch_size=8, collate_fn=lambda x: x,
+                                            num_workers=self.num_workers, prefetch_factor=self.prefetch_factor))
 
     def generate_batches_chunk(self):
         # No sampling in streaming; we expect dataset to be sharded and divided amongst nodes.
         LOG.info("generating packed batches")
 
         # Grab a bunch of examples from dataset.
-        examples = []
+        examples, lengths = [], []
         features = None
         tokens_per_batch = self.seq_max_length * self.sample_packing_seq_len_multiplier
         tokens_this_run = 0
         while True:
             try:
-                ex = next(self.dataset_iter)  # Use the iterator here
+                exs = next(self.dataset_iter)  # Use the iterator here
             except StopIteration:
                 LOG.info("Resetting iterator!")
-                self.dataset_iter = iter(DataLoader(self.dataset, batch_size=1, collate_fn=lambda x: x[0],
-                                                    num_workers=self.num_workers, prefetch_factor=self.prefetch_factor))
+                self._reset_iter()
                 continue
-            if features is None:
-                features = ex.keys()
-            else:
-                assert features == ex.keys()
-            tokens_this_run += (ex['position_ids'][-1] + 1)
-            examples.append(ex)
+            for ex in exs:
+                if features is None:
+                    features = ex.keys()
+                else:
+                    assert features == ex.keys()
+            examples += exs
+            lengths_this_run = [ex['position_ids'][-1] + 1 for ex in exs]
+            lengths += lengths_this_run
+            tokens_this_run += sum(lengths_this_run)
             if tokens_this_run >= (tokens_per_batch * 8.5):  # More examples for better packing.
                 break
         if not examples:
             return [], [], []
 
-        lengths = np.array([ex['position_ids'][-1] + 1 for ex in examples])
-        assert isinstance(lengths, np.ndarray)
+        lengths = np.array(lengths)
         lengths_cumsum = np.cumsum(lengths)
 
         batches, totseqs, total_used, total_slots = allocate(
