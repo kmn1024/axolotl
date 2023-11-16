@@ -115,13 +115,17 @@ class AxolotlTrainingArguments(TrainingArguments):
 
 
 class MinimumLearningRateScheduler(_LRScheduler):
-    def __init__(self, scheduler, min_lr):
+    def __init__(self, scheduler, num_training_steps, min_lr):
         self.scheduler = scheduler
+        self.num_training_steps = num_training_steps
         self.min_lr = min_lr
         super(MinimumLearningRateScheduler, self).__init__(scheduler.optimizer, scheduler.last_epoch)
 
     def get_lr(self):
-        return [max(lr, self.min_lr) for lr in self.scheduler.get_lr()]
+        if self.last_epoch >= self.total_steps / 2:
+            return [max(lr, self.min_lr) for lr in self.scheduler.get_lr()]
+        else:
+            return self.scheduler.get_lr()
 
     def step(self, epoch=None):
         self.scheduler.step(epoch)
@@ -167,7 +171,7 @@ class AxolotlTrainer(Trainer):
                 self.lr_scheduler = super().create_scheduler(num_training_steps, optimizer)
             if self.args.min_lr:
                 print(f'Minimum LR set: {self.args.min_lr}')
-                self.lr_scheduler = MinimumLearningRateScheduler(self.lr_scheduler, self.args.min_lr)
+                self.lr_scheduler = MinimumLearningRateScheduler(self.lr_scheduler, num_training_steps, self.args.min_lr)
         return self.lr_scheduler
 
     def _get_train_sampler(self) -> Optional[torch.utils.data.Sampler]:
