@@ -34,7 +34,7 @@ from axolotl.utils.callbacks import (
     log_prediction_callback_factory,
 )
 from axolotl.utils.collators import DataCollatorForSeq2Seq
-from axolotl.utils.dataloader import MultipackDistributedDataloader, StreamingMultipackDistributedDataloader
+from axolotl.utils.dataloader import MultipackDistributedDataloader, StreamingMultipackDistributedDataloaderNew
 from axolotl.utils.schedulers import get_cosine_schedule_with_quadratic_warmup
 
 try:
@@ -196,7 +196,7 @@ class AxolotlTrainer(Trainer):
             )
         return super()._get_eval_sampler(eval_dataset)
 
-    def get_train_dataloader(self) -> Union[DataLoader, MultipackDistributedDataloader, StreamingMultipackDistributedDataloader]:
+    def get_train_dataloader(self) -> Union[DataLoader, MultipackDistributedDataloader, StreamingMultipackDistributedDataloaderNew]:
         if self.args.sample_packing and not self.args.local_streaming_datasets:
             train_sampler = self._get_train_sampler()
             return self.accelerator.prepare(
@@ -217,9 +217,11 @@ class AxolotlTrainer(Trainer):
                                                        rank=self.args.process_index,
                                                        world_size=self.args.world_size)
             print(f'split_dataset_by_node shards: {self.train_dataset.n_shards}')
+            prefetch_factor = 2
             return self.accelerator.prepare(
-                StreamingMultipackDistributedDataloader(
+                StreamingMultipackDistributedDataloaderNew(
                     self.train_dataset, self.data_collator,
+                    self.args.dataloader_num_workers, prefetch_factor,
                     self.args.max_seq_length, self._train_batch_size,
                     self.args.sample_packing_seq_len_multiplier
                 )
