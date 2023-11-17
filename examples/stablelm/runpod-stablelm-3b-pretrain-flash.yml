@@ -71,7 +71,7 @@ val_set_size: 0
 eval_table_size:
 eval_table_max_new_tokens:
 debug:
-deepspeed: deepspeed/zero2.json
+deepspeed: deepspeed/zero2_cosine.json
 fsdp:
 fsdp_config:
 tokens:
