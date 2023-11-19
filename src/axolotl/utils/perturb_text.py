@@ -96,6 +96,8 @@ class Perturber:
             return text
         if skip_perterb_prob < 1 and random.random() <= skip_perterb_prob:
             return text
+        if text == '':
+            return text
         
         tokens, separators = get_words_and_separators(self.nlp, text)
         new_tokens, new_separators = [], []
