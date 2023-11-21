@@ -18,6 +18,7 @@ import torch
 import transformers
 from datasets import Dataset
 from datasets.distributed import split_dataset_by_node
+import torch.nn.functional as F
 from torch.optim.lr_scheduler import _LRScheduler, OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler, SequentialSampler
 from transformers import EarlyStoppingCallback, Trainer, TrainingArguments
@@ -43,6 +44,68 @@ except ImportError:
     pass
 
 LOG = logging.getLogger("axolotl.core.trainer_builder")
+
+
+class CandidatePenaltyCrossEntropyCriterion():
+    """Applies a (1-p(x_nt)) loss to each negative target ('candidate') x_nt."""
+
+    def __init__(self, tokenizer):
+        self.padding_idx = tokenizer.padding_token
+        self.IGNORE_TOKEN_ID = -100  # Copied from prompt_strategies
+
+    def forward(self, inputs, pred_logits):
+        target = inputs['labels']
+        print(target.shape)
+        print(pred_logits.shape)
+        target = target.view(-1)
+        print(target.shape)
+        lprobs = F.log_softmax(pred_logits, dim=-1)
+        print(lprobs.shape)
+        lprobs = lprobs.view(-1, lprobs.size(-1))
+        print(lprobs.shape)
+
+        true_token_lprobs = F.nll_loss(
+            lprobs,
+            target,
+            ignore_index=self.padding_idx,
+            reduction='none',
+        )
+        sanity_mle_loss = true_token_lprobs.sum()
+        print(sanity_mle_loss)
+
+        # -- unliklihood loss
+        # Maximize (1 - p(x_nt)) for negative target tokens x_nt (equivalently minimize -log(1-p(x_nt)))
+
+        # - form negative targets
+        with torch.no_grad():
+            # E.g. DABCC | D | EFFGD => {A,B,C} are negative targets.
+            # Make 'the triangle'.
+            ctx_cands = target.unsqueeze(0).expand(target.size(0), target.size(0))
+            print(ctx_cands.shape)
+            ctx_cands_ = (ctx_cands.tril(-1) + self.padding_idx)
+            ctx_cands_ = ctx_cands_ * ctx_cands_.triu()
+            ctx_cands = ctx_cands.tril(-1) + ctx_cands_
+            print(ctx_cands_.shape)
+
+            ctx_cands = ctx_cands.masked_fill(ctx_cands == self.IGNORE_TOKEN_ID, self.padding_idx)
+            # Don't include the target for that timestep as a negative target.
+            ctx_cands = ctx_cands.masked_fill(ctx_cands == target.unsqueeze(1), self.padding_idx)
+            print(ctx_cands)
+            negative_targets = torch.zeros_like(lprobs).scatter_(1, ctx_cands, 1)
+            print(negative_targets.shape)
+            print(negative_targets)
+
+        # - compute loss
+        one_minus_probs = torch.clamp((1.0 - lprobs.exp()), min=1e-5)
+        unliklihood_loss = -torch.log(one_minus_probs)*negative_targets
+        unliklihood_loss = unliklihood_loss.sum()
+        print(unliklihood_loss)
+        print({
+            'unliklihood_loss': unliklihood_loss.data,
+            'loss': sanity_mle_loss.data,
+        })
+        assert False
+        return unliklihood_loss
 
 
 @dataclass
@@ -253,13 +316,12 @@ class AxolotlTrainer(Trainer):
         # return self.accelerator.prepare(DataLoader(bench_dataset, **dataloader_params))
 
     def compute_loss(self, model, inputs, return_outputs=False):
-        # use one's weighted cross entropy loss calc
-        # if self.args.sample_packing:
-        #     labels = inputs.pop("labels")
-        #     outputs = model(**inputs)
-        #     loss = trainer_weighted_loss(outputs, labels, shift_labels=True)
-        #     return (loss, outputs) if return_outputs else loss
-        return super().compute_loss(model, inputs, return_outputs=return_outputs)
+        primary_loss, model_outputs = super().compute_loss(model, inputs, return_outputs=True)
+        candidate_penalty = CandidatePenaltyCrossEntropyCriterion(self.tokenizer)
+        secondary_loss = candidate_penalty(inputs, model_outputs['logits'])
+        loss = primary_loss + self.args.alpha_weight * secondary_loss
+        return (loss, model_outputs) if return_outputs else loss
+
 
 
 class OneCycleLRSchedulerTrainer(AxolotlTrainer):
