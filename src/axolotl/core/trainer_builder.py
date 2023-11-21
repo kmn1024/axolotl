@@ -50,29 +50,27 @@ class CandidatePenaltyCrossEntropyCriterion():
     """Applies a (1-p(x_nt)) loss to each negative target ('candidate') x_nt."""
 
     def __init__(self, tokenizer):
-        self.padding_idx = tokenizer.padding_token
+        self.padding_idx = tokenizer.pad_token_id
         self.IGNORE_TOKEN_ID = -100  # Copied from prompt_strategies
 
     def forward(self, inputs, pred_logits):
         target = inputs['labels']
-        print(target.shape)
-        print(pred_logits.shape)
-        target = target.view(-1)
-        target = target.masked_fill(target == self.IGNORE_TOKEN_ID, self.padding_idx)
-        print(target.shape)
-        lprobs = F.log_softmax(pred_logits, dim=-1)
-        print(lprobs.shape)
-        lprobs = lprobs.view(-1, lprobs.size(-1))
-        print(lprobs.shape)
+        shift_targets = target[..., 1:].contiguous()
+        shift_targets = shift_targets.view(-1)
+        shift_targets = shift_targets.masked_fill(shift_targets == self.IGNORE_TOKEN_ID, self.padding_idx)
+        mask_ignore = shift_targets != self.padding_idx
+        shift_targets = shift_targets[mask_ignore]
 
-        true_token_lprobs = F.nll_loss(
-            lprobs,
-            target,
-            ignore_index=self.padding_idx,
-            reduction='none',
-        )
-        sanity_mle_loss = true_token_lprobs.sum()
-        print(sanity_mle_loss)
+        shift_logits = pred_logits[..., :-1, :].contiguous()
+        shift_lprobs = F.log_softmax(shift_logits, dim=-1)
+        shift_lprobs = shift_lprobs.view(-1, shift_lprobs.size(-1))
+        shift_lprobs = shift_lprobs[mask_ignore]
+
+        # Sanity check that this is the same as primary_loss.
+        sanity_mle_loss = F.nll_loss(
+            shift_lprobs,
+            shift_targets,
+            reduction='mean')
 
         # -- unliklihood loss
         # Maximize (1 - p(x_nt)) for negative target tokens x_nt (equivalently minimize -log(1-p(x_nt)))
@@ -82,30 +80,22 @@ class CandidatePenaltyCrossEntropyCriterion():
             # E.g. DABCC | D | EFFGD => {A,B,C} are negative targets.
             # Make 'the triangle'.
             # There's still a bug since we have packed batches: https://github.com/facebookresearch/unlikelihood_training/issues/11#issue-1630788451
-            ctx_cands = target.unsqueeze(0).expand(target.size(0), target.size(0))
-            print(ctx_cands.shape)
-            rows, cols = torch.triu_indices(target.size(0), target.size(0))
+            ctx_cands = shift_targets.unsqueeze(0).expand(shift_targets.size(0), shift_targets.size(0))
+            rows, cols = torch.triu_indices(shift_targets.size(0), shift_targets.size(0))
             ctx_cands[rows, cols] = self.padding_idx
-            print(ctx_cands.shape)
-
             # Don't include the target for that timestep as a negative target.
-            ctx_cands = ctx_cands.masked_fill(ctx_cands == target.unsqueeze(1), self.padding_idx)
-            print(ctx_cands.shape)
-            negative_targets = torch.zeros_like(lprobs).scatter_(1, ctx_cands, 1)
-            print(negative_targets.shape)
-            print(negative_targets)
+            ctx_cands = ctx_cands.masked_fill(ctx_cands == shift_targets.unsqueeze(1), self.padding_idx)
+            negative_targets = torch.zeros_like(shift_lprobs).scatter_(1, ctx_cands, 1)
 
         # - compute loss
-        one_minus_probs = torch.clamp((1.0 - lprobs.exp()), min=1e-5)
+        one_minus_probs = torch.clamp((1.0 - shift_lprobs.exp()), min=1e-5)
         unliklihood_loss = -torch.log(one_minus_probs)*negative_targets
-        unliklihood_loss = unliklihood_loss.sum()
-        print(unliklihood_loss)
-        print({
+        unliklihood_loss = unliklihood_loss.sum(1).mean()
+        loss_map = {
             'unliklihood_loss': unliklihood_loss.data,
-            'loss': sanity_mle_loss.data,
-        })
-        assert False
-        return unliklihood_loss
+            'sanity_mle_loss': sanity_mle_loss.data,
+        }
+        return unliklihood_loss, loss_map
 
 
 @dataclass
@@ -318,8 +308,10 @@ class AxolotlTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False):
         primary_loss, model_outputs = super().compute_loss(model, inputs, return_outputs=True)
         candidate_penalty = CandidatePenaltyCrossEntropyCriterion(self.tokenizer)
-        secondary_loss = candidate_penalty(inputs, model_outputs['logits'])
-        loss = primary_loss + self.args.alpha_weight * secondary_loss
+        secondary_loss, loss_map = candidate_penalty.forward(inputs, model_outputs['logits'])
+        loss_map['primary_loss'] = primary_loss.data
+        LOG.info(loss_map)
+        loss = primary_loss + 0.0000000000001 * secondary_loss
         return (loss, model_outputs) if return_outputs else loss
 
 
