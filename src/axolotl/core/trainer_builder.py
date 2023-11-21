@@ -58,6 +58,7 @@ class CandidatePenaltyCrossEntropyCriterion():
         print(target.shape)
         print(pred_logits.shape)
         target = target.view(-1)
+        target = target.masked_fill(target == self.IGNORE_TOKEN_ID, self.padding_idx)
         print(target.shape)
         lprobs = F.log_softmax(pred_logits, dim=-1)
         print(lprobs.shape)
@@ -80,17 +81,16 @@ class CandidatePenaltyCrossEntropyCriterion():
         with torch.no_grad():
             # E.g. DABCC | D | EFFGD => {A,B,C} are negative targets.
             # Make 'the triangle'.
+            # There's still a bug since we have packed batches: https://github.com/facebookresearch/unlikelihood_training/issues/11#issue-1630788451
             ctx_cands = target.unsqueeze(0).expand(target.size(0), target.size(0))
             print(ctx_cands.shape)
-            ctx_cands_ = (ctx_cands.tril(-1) + self.padding_idx)
-            ctx_cands_ = ctx_cands_ * ctx_cands_.triu()
-            ctx_cands = ctx_cands.tril(-1) + ctx_cands_
-            print(ctx_cands_.shape)
+            rows, cols = torch.triu_indices(target.size(0), target.size(0))
+            ctx_cands[rows, cols] = self.padding_idx
+            print(ctx_cands.shape)
 
-            ctx_cands = ctx_cands.masked_fill(ctx_cands == self.IGNORE_TOKEN_ID, self.padding_idx)
             # Don't include the target for that timestep as a negative target.
             ctx_cands = ctx_cands.masked_fill(ctx_cands == target.unsqueeze(1), self.padding_idx)
-            print(ctx_cands)
+            print(ctx_cands.shape)
             negative_targets = torch.zeros_like(lprobs).scatter_(1, ctx_cands, 1)
             print(negative_targets.shape)
             print(negative_targets)
@@ -765,6 +765,7 @@ class HFCausalTrainerBuilder(TrainerBuilderBase):
                 **data_collator_kwargs,
             ),
             callbacks=self.get_callbacks(),
+            tokenizer=self.tokenizer,
             **trainer_kwargs,
         )
         trainer = self.hook_post_create_trainer(trainer)
