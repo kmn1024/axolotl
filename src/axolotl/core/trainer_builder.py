@@ -85,7 +85,7 @@ class CandidatePenaltyCrossEntropyCriterion():
             # E.g. DABCC | D | EFFGD => {A,B,C} are negative targets.
             # Make 'the triangle'.
             # There's still a bug since we have packed batches: https://github.com/facebookresearch/unlikelihood_training/issues/11#issue-1630788451
-            ctx_cands = shift_targets.unsqueeze(0).expand(shift_targets.size(0), shift_targets.size(0))
+            ctx_cands = shift_targets.unsqueeze(0).repeat(shift_targets.size(0), 1)
             rows, cols = torch.triu_indices(shift_targets.size(0), shift_targets.size(0))
             ctx_cands[rows, cols] = self.padding_idx
             # Don't include the target for that timestep as a negative target.
