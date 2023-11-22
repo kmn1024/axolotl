@@ -8,6 +8,7 @@ import logging
 import math
 import os
 import sys
+import wandb
 from abc import abstractmethod
 from dataclasses import dataclass, field
 from functools import partial
@@ -37,6 +38,10 @@ from axolotl.utils.callbacks import (
 from axolotl.utils.collators import DataCollatorForSeq2Seq
 from axolotl.utils.dataloader import MultipackDistributedDataloader, StreamingMultipackDistributedDataloaderNew
 from axolotl.utils.schedulers import get_cosine_schedule_with_quadratic_warmup
+from axolotl.utils.distributed import (
+    is_main_process,
+)
+
 
 try:
     import torch._dynamo  # pylint: disable=ungrouped-imports
@@ -66,11 +71,11 @@ class CandidatePenaltyCrossEntropyCriterion():
         shift_lprobs = shift_lprobs.view(-1, shift_lprobs.size(-1))
         shift_lprobs = shift_lprobs[mask_ignore]
 
-        # Sanity check that this is the same as primary_loss.
-        sanity_mle_loss = F.nll_loss(
-            shift_lprobs,
-            shift_targets,
-            reduction='mean')
+        # # Sanity check that this is the same as primary_loss.
+        # sanity_mle_loss = F.nll_loss(
+        #     shift_lprobs,
+        #     shift_targets,
+        #     reduction='mean')
 
         # -- unliklihood loss
         # Maximize (1 - p(x_nt)) for negative target tokens x_nt (equivalently minimize -log(1-p(x_nt)))
@@ -91,11 +96,7 @@ class CandidatePenaltyCrossEntropyCriterion():
         one_minus_probs = torch.clamp((1.0 - shift_lprobs.exp()), min=1e-5)
         unliklihood_loss = -torch.log(one_minus_probs)*negative_targets
         unliklihood_loss = unliklihood_loss.sum(1).mean()
-        loss_map = {
-            'unliklihood_loss': unliklihood_loss.data,
-            'sanity_mle_loss': sanity_mle_loss.data,
-        }
-        return unliklihood_loss, loss_map
+        return unliklihood_loss
 
 
 @dataclass
@@ -306,14 +307,15 @@ class AxolotlTrainer(Trainer):
         # return self.accelerator.prepare(DataLoader(bench_dataset, **dataloader_params))
 
     def compute_loss(self, model, inputs, return_outputs=False):
-        # primary_loss, model_outputs = super().compute_loss(model, inputs, return_outputs=True)
-        # candidate_penalty = CandidatePenaltyCrossEntropyCriterion(self.tokenizer)
-        # secondary_loss, loss_map = candidate_penalty.forward(inputs, model_outputs['logits'])
-        # loss_map['primary_loss'] = primary_loss.data
-        # LOG.info(loss_map)
-        # loss = primary_loss + 0.0000000000001 * secondary_loss
-        # return (loss, model_outputs) if return_outputs else loss
-        return super().compute_loss(model, inputs, return_outputs=return_outputs)
+        primary_loss, model_outputs = super().compute_loss(model, inputs, return_outputs=True)
+        candidate_penalty = CandidatePenaltyCrossEntropyCriterion(self.tokenizer)
+        secondary_loss = candidate_penalty.forward(inputs, model_outputs['logits'])
+        if is_main_process():
+            LOG.info(f'primary_loss:{primary_loss.data.item()}, secondary_loss:{secondary_loss.data.item()}')
+            wandb.log({"primary_loss": primary_loss.data.item(), "secondary_loss": secondary_loss.item()})
+        loss = primary_loss + 0.0000000000001 * secondary_loss
+        return (loss, model_outputs) if return_outputs else loss
+        #return super().compute_loss(model, inputs, return_outputs=return_outputs)
 
 
 
