@@ -306,13 +306,14 @@ class AxolotlTrainer(Trainer):
         # return self.accelerator.prepare(DataLoader(bench_dataset, **dataloader_params))
 
     def compute_loss(self, model, inputs, return_outputs=False):
-        primary_loss, model_outputs = super().compute_loss(model, inputs, return_outputs=True)
-        candidate_penalty = CandidatePenaltyCrossEntropyCriterion(self.tokenizer)
-        secondary_loss, loss_map = candidate_penalty.forward(inputs, model_outputs['logits'])
-        loss_map['primary_loss'] = primary_loss.data
-        LOG.info(loss_map)
-        loss = primary_loss + 0.0000000000001 * secondary_loss
-        return (loss, model_outputs) if return_outputs else loss
+        # primary_loss, model_outputs = super().compute_loss(model, inputs, return_outputs=True)
+        # candidate_penalty = CandidatePenaltyCrossEntropyCriterion(self.tokenizer)
+        # secondary_loss, loss_map = candidate_penalty.forward(inputs, model_outputs['logits'])
+        # loss_map['primary_loss'] = primary_loss.data
+        # LOG.info(loss_map)
+        # loss = primary_loss + 0.0000000000001 * secondary_loss
+        # return (loss, model_outputs) if return_outputs else loss
+        return super().compute_loss(model, inputs, return_outputs=return_outputs)
 
 
 
