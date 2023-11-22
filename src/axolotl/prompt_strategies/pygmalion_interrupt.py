@@ -26,16 +26,21 @@ class PygmalionInterruptPromptTokenizingStrategy(PromptTokenizingStrategy):
     def __init__(self, prompter, tokenizer, *args, **kwargs):
         super().__init__(prompter, tokenizer, *args, **kwargs)
         res = self._tokenize("<|model|>", add_eos_token=False, strip_bos_token=True)
-        bot_prefix_token_ids = res["input_ids"]
-        assert len(bot_prefix_token_ids) == 1, bot_prefix_token_ids
-        res = self._tokenize("<|user|>", add_eos_token=False, strip_bos_token=True)
-        user_prefix_token_ids = res["input_ids"]
-        assert len(user_prefix_token_ids) == 1, user_prefix_token_ids
+        self.bot_prefix_token_ids = res["input_ids"]
         self.perturber = Perturber.instance()
 
     @property
     def supports_batched(self):
         return True
+    
+    # Split user input to simulate interruption. Keep at least first 2 words from user input to not be super rude and wrong.
+    def _split_message_for_interrupt(self, message: str):
+        parts = [p for p in message.split(' ') if len(p.strip()) > 0]
+        if len(parts) <= 2:
+            return message, ''
+        else:
+            end = random.randint(2, len(parts))
+            return ' '.join(parts[0:end]), ' '.join(parts[end:])
 
     def tokenize_prompt(self, prompt):
         INCREMENT = int(0.7 * self.sequence_len)
@@ -88,37 +93,38 @@ class PygmalionInterruptPromptTokenizingStrategy(PromptTokenizingStrategy):
                     assert bot_role == "bot"
                 
                     user_prefix = "<|user|>"
-                    user_message = self.perturber.perturb_text(message.strip())
+                    user_message, interrupted_message = self._split_message_for_interrupt(message.strip())
+                    user_message = self.perturber.perturb_text(user_message)
                     user_res = self._tokenize(
                         user_prefix + " " + user_message,
                         add_eos_token=False,
                         strip_bos_token=True,
                     )
-                    # Number of tokens that can be used for training before the bot message.
-                    # The user_prefix is not trainable, but the bot_prefix is (i.e. when should bot speak).
-                    # We want to skip at least the first 2 tokens of user_res (excluding user_prefix), so that bot
-                    # learns to listen at least to a bit of user input, before potentially interrupting.
-                    assert len(user_res["input_ids"]) >= 1, f'{user_prefix + " " + user_message} -> {user_res}'
-                    trainable_user_tokens = len(user_res["input_ids"]) - 1
-                    trainable_tokens_start = random.randint(min(2, trainable_user_tokens), trainable_user_tokens + 1)
-                    # everything up to ignored_user_tokens_end is masked out and not trained on.
-                    ignored_user_tokens_end = (1 + min(trainable_tokens_start, trainable_user_tokens))
-                    user_labels = ([IGNORE_TOKEN_ID] * ignored_user_tokens_end +
-                                   [*copy.deepcopy(user_res["input_ids"])][ignored_user_tokens_end:])
+                    # everything from this is masked out from the labels
+                    user_labels = [IGNORE_TOKEN_ID] * len(user_res["input_ids"])
 
-                    bot_prefix = "<|model|>"
-                    bot_res = self._tokenize(
-                        bot_prefix + " " + bot_message.strip(),
-                        add_eos_token=True,
-                        strip_bos_token=True,
-                    )
-                    # mask out the prefix token, rest is not masked out from labels
-                    # make sure we create the labels first, otherwise we get incorrect lengths
-                    if trainable_tokens_start == trainable_user_tokens + 1:
-                        assert user_labels == [IGNORE_TOKEN_ID] * len(user_res["input_ids"]), f'user_res: {user_res} | trainable_user_tokens:{trainable_user_tokens} | trainable_tokens_start:{trainable_tokens_start}'
-                        bot_labels = [IGNORE_TOKEN_ID] + [*copy.deepcopy(bot_res["input_ids"])][1:]
-                    else:
+                    if len(interrupted_message) > 0 or random.random() <= 0.5:
+                        bot_prefix = f"{interrupted_message}<|model|>"
+                        bot_res = self._tokenize(
+                            bot_prefix + " " + bot_message.strip(),
+                            add_eos_token=True,
+                            strip_bos_token=True,
+                        )
+                        # In case we interrupt the user (or predict user's EOM), model needs to learn
+                        # everything here, including the prefix token.
                         bot_labels = [*copy.deepcopy(bot_res["input_ids"])]
+                    else:
+                        bot_prefix = "<|model|>"
+                        bot_res = self._tokenize(
+                            bot_prefix + " " + bot_message.strip(),
+                            add_eos_token=True,
+                            strip_bos_token=True,
+                        )
+                        # mask out the prefix token, rest is not masked out from labels
+                        # make sure we create the labels first, otherwise we get incorrect lengths
+                        bot_labels = [IGNORE_TOKEN_ID] * len(self.bot_prefix_token_ids) + [
+                            *copy.deepcopy(bot_res["input_ids"])
+                        ][len(self.bot_prefix_token_ids) :]
 
                     result, current_len = parse_tokenized_to_result(
                         result,
