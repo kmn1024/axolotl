@@ -315,7 +315,7 @@ class AxolotlTrainer(Trainer):
         if model.training and is_main_process():  # Ugly, should put into callback.
             self.primary_loss_tmp.append(primary_loss.data.item())
             self.secondary_loss_tmp.append(secondary_loss.data.item())
-            if self.primary_loss_tmp and len(self.primary_loss_tmp) % self.args.gradient_accumulation_steps == 0:
+            if self.primary_loss_tmp and len(self.primary_loss_tmp) % (self.args.gradient_accumulation_steps * self.args.logging_steps) == 0:
                 step_primary_loss = np.mean(self.primary_loss_tmp)
                 step_secondary_loss = np.mean(self.secondary_loss_tmp)
                 LOG.info(f'primary_loss:{step_primary_loss}, secondary_loss:{step_secondary_loss}')
