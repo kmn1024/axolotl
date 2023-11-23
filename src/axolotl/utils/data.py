@@ -344,6 +344,7 @@ def load_tokenized_prepared_datasets_local_stream(
                 elif local_path.is_file():
                     datafiles.append((d, d.name, d.path))
         
+        random.shuffle(datafiles)
         d = None
         data_files = []
         for this_d, name, path in datafiles:
