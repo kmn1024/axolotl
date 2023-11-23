@@ -17,6 +17,8 @@ LOG = logging.getLogger("axolotl")
 
 IGNORE_TOKEN_ID = -100
 RANDOM_INJECT_SYSTEM_RATE = 0.2
+INTERRUPT_RATE = 0.6  # Train on some user input at this rate (versus only training on bot response)
+INTERRUPT_PROTECTED_WORDS = 2  # Keep (do not train on) at least this many user input words
 
 class PygmalionInterruptPromptTokenizingStrategy(PromptTokenizingStrategy):
     """
@@ -33,13 +35,13 @@ class PygmalionInterruptPromptTokenizingStrategy(PromptTokenizingStrategy):
     def supports_batched(self):
         return True
     
-    # Split user input to simulate interruption. Keep at least first 2 words from user input to not be super rude and wrong.
+    # Split user input to simulate interruption. Keep at least first X words from user input to not be super rude and wrong.
     def _split_message_for_interrupt(self, message: str):
         parts = [p for p in message.split(' ') if len(p.strip()) > 0]
-        if len(parts) <= 2:
+        if len(parts) <= INTERRUPT_PROTECTED_WORDS:
             return message, ''
         else:
-            end = random.randint(2, len(parts))
+            end = random.randint(INTERRUPT_PROTECTED_WORDS, len(parts))
             return ' '.join(parts[0:end]), ' '.join(parts[end:])
 
     def tokenize_prompt(self, prompt):
@@ -93,7 +95,11 @@ class PygmalionInterruptPromptTokenizingStrategy(PromptTokenizingStrategy):
                     assert bot_role == "bot"
                 
                     user_prefix = "<|user|>"
-                    user_message, interrupted_message = self._split_message_for_interrupt(message.strip())
+                    should_interrupt = random.random() <= INTERRUPT_RATE
+                    if should_interrupt:
+                        user_message, interrupted_message = self._split_message_for_interrupt(message.strip())
+                    else:
+                        user_message, interrupted_message = message.strip(), ''
                     user_message = self.perturber.perturb_text(user_message)
                     user_res = self._tokenize(
                         user_prefix + " " + user_message,
@@ -103,10 +109,9 @@ class PygmalionInterruptPromptTokenizingStrategy(PromptTokenizingStrategy):
                     # everything from this is masked out from the labels
                     user_labels = [IGNORE_TOKEN_ID] * len(user_res["input_ids"])
 
-                    if len(interrupted_message) > 0 or random.random() <= 0.5:
-                        bot_prefix = f"{interrupted_message}<|model|>"
+                    if should_interrupt:
                         bot_res = self._tokenize(
-                            bot_prefix + " " + bot_message.strip(),
+                            f"{interrupted_message}<|model|> " + bot_message.strip(),
                             add_eos_token=True,
                             strip_bos_token=True,
                         )

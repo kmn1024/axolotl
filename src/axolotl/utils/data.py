@@ -268,7 +268,7 @@ def load_tokenized_prepared_datasets_local_stream(
             split=None,
         )
         return ds
-
+    
     if is_eval:
         # pylint: disable=invalid-name
         datasets = []
@@ -291,6 +291,42 @@ def load_tokenized_prepared_datasets_local_stream(
                     )
         datasets = [postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True) for d, ds in datasets]
         dataset = concatenate_datasets(datasets)
+    elif cfg.ordered_datasets:
+        all_datasets = []
+        for d in for_d_in_datasets(dataset_configs):
+            datafiles = []
+            # prefer local dataset, even if hub exists
+            local_path = Path(d.path)
+            if local_path.exists():
+                if local_path.is_dir():
+                    dir_filepaths = sorted(glob.glob(os.path.join(d.path, '*')))
+                    assert len(dir_filepaths) > 0
+                    for dir_filepath in dir_filepaths:
+                        assert os.path.isfile(dir_filepath), dir_filepath
+                        file_ds_name = d.name + '_' + os.path.basename(dir_filepath)
+                        datafiles.append((d, file_ds_name, dir_filepath))
+                elif local_path.is_file():
+                    datafiles.append((d, d.name, d.path))
+        
+            d = None
+            data_files = []
+            for this_d, name, path in datafiles:
+                data_files.append(path)
+                if d is None:
+                    d = this_d
+                else:
+                    assert this_d.ds_type == d.ds_type
+            ds = load_dataset(
+                d.ds_type,
+                data_files=data_files,
+                streaming=True,
+                split=None,
+            )
+            ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
+            print(f'Training data {d.name} shards: {ds.n_shards}')
+            all_datasets.append(ds)
+        dataset = concatenate_datasets(all_datasets)
+        print(f'Training data concatenated shards: {dataset.n_shards}')
     else:
         # pylint: disable=invalid-name
         datafiles = []

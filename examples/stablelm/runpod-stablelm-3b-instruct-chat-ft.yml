@@ -11,10 +11,19 @@ strict: false
 local_streaming_datasets: True
 dataset_columns:
   - 'conversations'
+ordered_datasets: True
 datasets:
-  - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat_sharded/'
-    name: 'final_256_jsonl'
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_instruct_sharded/'
+    name: 'instruct'
     type: pygmalion
+    ds_type: 'json'
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat_sharded/'
+    name: 'chat'
+    type: pygmalion
+    ds_type: 'json'
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat_sharded/'
+    name: 'chat_interrupt'
+    type: pygmalion_interrupt
     ds_type: 'json'
 eval_datasets:
   - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat_eval_sharded/'
