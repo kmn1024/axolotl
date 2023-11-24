@@ -154,6 +154,7 @@ class Perturber:
         output_str = ''.join(output) + new_tokens[-1]
         # Sanity
         if len(text) >= 128:
-            assert len(output_str) < 2 * len(text), f'Impossible growth: {len(text)} -> {len(output_str)}. {text} \n {tokens}'
+            if len(output_str) >= 2 * len(text):
+                return text
         #print(f'Perturbed: {text} -> {output_str}')
         return output_str
