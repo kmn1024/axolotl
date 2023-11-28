@@ -31,19 +31,18 @@ eval_datasets:
     type: pygmalion
     ds_type: 'json'
 
-
 dataset_prepared_path: /workspace/dataset_prepared_path
 output_dir: /workspace/mistral-7b-chat
 
 sequence_len: 8192
-sample_packing: true
+sample_packing: true  # Try false? Also disable pad_to_sequence_len
 eval_sample_packing: true
 pad_to_sequence_len: true
 
 wandb_project: mistral-7b-chat-pretrained-full
 wandb_entity:
 wandb_watch:
-wandb_run_id:
+wandb_run_id: 
 wandb_log_model:
 
 dataloader_num_workers: 12
@@ -85,6 +84,11 @@ debug:
 deepspeed: deepspeed/zero2.json
 fsdp:
 fsdp_config:
+special_tokens:
+  pad_token: "<pad>"  # Try "<unk>"?
+  bos_token: "<s>"
+  eos_token: "</s>"
+  unk_token: "<unk>"
 tokens:
   - "<|system|>"
   - "<|user|>"
