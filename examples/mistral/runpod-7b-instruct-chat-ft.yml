@@ -25,6 +25,14 @@ datasets:
     name: 'chat_interrupt'
     type: pygmalion_interrupt
     ds_type: 'json'
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat_sharded/'
+    name: 'chat'
+    type: pygmalion
+    ds_type: 'json'
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat_sharded/'
+    name: 'chat_interrupt'
+    type: pygmalion_interrupt
+    ds_type: 'json'
 eval_datasets:
   - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat_eval_sharded/'
     name: 'final_256_eval_jsonl'
@@ -53,7 +61,7 @@ adam_beta1: 0.9
 adam_beta2: 0.95
 adam_epsilon: 0.000001  # 0.00001 for better stability
 lr_scheduler: cosine
-learning_rate: 0.00003  # Official is 0.000025
+learning_rate: 0.000025  # Official is 0.000025
 weight_decay: 0.1
 max_grad_norm: 1.0
 # Official has dropout = 0.2 (but "didn't make much difference")
@@ -71,9 +79,9 @@ local_rank:
 xformers_attention:
 flash_attention: true
 
-max_steps: 2300  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps * GPUs) = (332232000/5.5) / (4096*6*2*2)
+max_steps: 1800  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps * GPUs) = (332232000/5.5) / (4096*6*2*2)
 logging_steps: 2
-warmup_steps: 60
+warmup_steps: 50
 save_steps: 0.05  # 1 / epochs
 eval_steps: 20
 
