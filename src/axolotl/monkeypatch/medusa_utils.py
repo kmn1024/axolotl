@@ -115,6 +115,7 @@ def add_medusa_heads(
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[List[torch.FloatTensor]] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
@@ -222,4 +223,4 @@ def replace_compute_loss(
                 "train/global_step": self.state.global_step,
             })
         return (loss, logits) if return_outputs else loss
-    axolotl.utils.trainer.Trainer.compute_loss = compute_loss
+    axolotl.core.trainer_builder.AxolotlTrainer.compute_loss = compute_loss

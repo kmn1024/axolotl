@@ -39,7 +39,7 @@ wandb_log_model:
 
 dataloader_num_workers: 12
 gradient_accumulation_steps: 1
-micro_batch_size: 32
+micro_batch_size: 4
 optimizer: adamw_torch
 adam_beta1: 0.9
 adam_beta2: 0.95
@@ -72,7 +72,7 @@ val_set_size: 0
 eval_table_size:
 eval_table_max_new_tokens:
 debug:
-deepspeed: deepspeed/zero2_cosine.json
+deepspeed: deepspeed/zero2.json
 fsdp:
 fsdp_config:
 tokens:
