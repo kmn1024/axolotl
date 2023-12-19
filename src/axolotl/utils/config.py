@@ -129,6 +129,8 @@ def normalize_config(cfg):
         cfg.medusa_num_layers = cfg.medusa_num_layers if cfg.medusa_num_layers is not None else 0
         cfg.medusa_decay_coefficient = cfg.medusa_decay_coefficient if cfg.medusa_decay_coefficient is not None else 1.0
         cfg.medusa_logging = cfg.medusa_logging if cfg.medusa_logging is not None else False
+        cfg.medusa_num_unfreeze_layers = cfg.medusa_num_unfreeze_layers if cfg.medusa_num_unfreeze_layers is not None else 0
+        cfg.medusa_lr_multiplier = cfg.medusa_lr_multiplier if cfg.medusa_lr_multiplier is not None else 1
 
     log_gpu_memory_usage(LOG, "baseline", cfg.device)
 

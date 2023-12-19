@@ -22,7 +22,7 @@ from transformers import (  # noqa: F401
     PreTrainedTokenizerBase,
 )
 
-from axolotl.monkeypatch.medusa_utils import replace_compute_loss, add_medusa_heads
+from axolotl.monkeypatch.medusa_utils import replace_compute_loss, add_medusa_heads, replace_create_optimizer
 from axolotl.prompt_tokenizers import LLAMA_DEFAULT_EOS_TOKEN
 from axolotl.utils.bench import log_gpu_memory_usage
 from axolotl.utils.dict import DictDefault
@@ -463,11 +463,23 @@ def load_model(
             param.requires_grad = False
         for param in model.medusa_head.parameters():
             param.requires_grad = True
+        if cfg.medusa_num_unfreeze_layers > 0:
+            for layer in model.model.layers[-cfg.medusa_num_unfreeze_layers:]:
+                LOG.info(f"Unfreezing layer {layer}")
+                for param in layer.parameters():
+                    param.requires_grad = True
+            for param in model.lm_head.parameters():
+                param.requires_grad = True
         replace_compute_loss(
             medusa_decay_coefficient=cfg.medusa_decay_coefficient,
             medusa_logging=cfg.medusa_logging,
         )
-
+        if cfg.medusa_lr_multiplier != 1:
+            LOG.info(f"Using Medusa LR multiplier {cfg.medusa_lr_multiplier}")
+            replace_create_optimizer(
+                medusa_lr_multiplier=cfg.medusa_lr_multiplier,
+            )
+    
     model, lora_config = load_adapter(model, cfg, cfg.adapter)
 
     if cfg.ddp and not load_in_8bit:

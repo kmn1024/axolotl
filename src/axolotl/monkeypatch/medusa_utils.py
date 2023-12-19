@@ -224,3 +224,46 @@ def replace_compute_loss(
             })
         return (loss, logits) if return_outputs else loss
     axolotl.core.trainer_builder.AxolotlTrainer.compute_loss = compute_loss
+
+
+def replace_create_optimizer(
+    medusa_lr_multiplier,
+):
+    # Copy and simplified from transformers.Trainer.create_optimizer
+    from transformers.trainer import Trainer
+    def create_optimizer(self):
+        """
+        Setup the optimizer.
+        We provide a reasonable default that works well. If you want to use something else, you can pass a tuple in the
+        Trainer's init through `optimizers`, or subclass and override this method in a subclass.
+        """
+        opt_model = self.model
+        if self.optimizer is None:
+            decay_parameters = self.get_decay_parameter_names(opt_model)
+            # Separately set lr for medusa_head
+            optimizer_grouped_parameters = [
+                {
+                    "params": [
+                        p for n, p in opt_model.named_parameters() if (n in decay_parameters and p.requires_grad and "medusa_head" not in n)
+                    ],
+                    "weight_decay": self.args.weight_decay,
+                },
+                {
+                    "params": [
+                        p for n, p in opt_model.named_parameters() if (n in decay_parameters and p.requires_grad and "medusa_head" in n)
+                    ],
+                    "weight_decay": self.args.weight_decay,
+                    "lr": self.args.learning_rate * medusa_lr_multiplier,
+                },
+
+                {
+                    "params": [
+                        p for n, p in opt_model.named_parameters() if (n not in decay_parameters and p.requires_grad)
+                    ],
+                    "weight_decay": 0.0,
+                },
+            ]
+            optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
+            self.optimizer = optimizer_cls(optimizer_grouped_parameters, **optimizer_kwargs)
+        return self.optimizer
+    axolotl.core.trainer_builder.AxolotlTrainer.create_optimizer = create_optimizer
