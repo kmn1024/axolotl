@@ -309,22 +309,22 @@ class AxolotlTrainer(Trainer):
         # return self.accelerator.prepare(DataLoader(bench_dataset, **dataloader_params))
 
     def compute_loss(self, model, inputs, return_outputs=False):
-        primary_loss, model_outputs = super().compute_loss(model, inputs, return_outputs=True)
-        candidate_penalty = CandidatePenaltyCrossEntropyCriterion(self.tokenizer)
-        secondary_loss = candidate_penalty.forward(inputs, model_outputs['logits'])
-        if model.training and is_main_process():  # Ugly, should put into callback.
-            self.primary_loss_tmp.append(primary_loss.data.item())
-            self.secondary_loss_tmp.append(secondary_loss.data.item())
-            if self.primary_loss_tmp and len(self.primary_loss_tmp) % (self.args.gradient_accumulation_steps * self.args.logging_steps) == 0:
-                step_primary_loss = np.mean(self.primary_loss_tmp)
-                step_secondary_loss = np.mean(self.secondary_loss_tmp)
-                LOG.info(f'primary_loss:{step_primary_loss}, secondary_loss:{step_secondary_loss}')
-                wandb.log({"primary_loss": step_primary_loss, "secondary_loss": step_secondary_loss})
-                self.primary_loss_tmp = []
-                self.secondary_loss_tmp = []
-        loss = primary_loss + 1.0 * secondary_loss
-        return (loss, model_outputs) if return_outputs else loss
-        #return super().compute_loss(model, inputs, return_outputs=return_outputs)
+        # primary_loss, model_outputs = super().compute_loss(model, inputs, return_outputs=True)
+        # candidate_penalty = CandidatePenaltyCrossEntropyCriterion(self.tokenizer)
+        # secondary_loss = candidate_penalty.forward(inputs, model_outputs['logits'])
+        # if model.training and is_main_process():  # Ugly, should put into callback.
+        #     self.primary_loss_tmp.append(primary_loss.data.item())
+        #     self.secondary_loss_tmp.append(secondary_loss.data.item())
+        #     if self.primary_loss_tmp and len(self.primary_loss_tmp) % (self.args.gradient_accumulation_steps * self.args.logging_steps) == 0:
+        #         step_primary_loss = np.mean(self.primary_loss_tmp)
+        #         step_secondary_loss = np.mean(self.secondary_loss_tmp)
+        #         LOG.info(f'primary_loss:{step_primary_loss}, secondary_loss:{step_secondary_loss}')
+        #         wandb.log({"primary_loss": step_primary_loss, "secondary_loss": step_secondary_loss})
+        #         self.primary_loss_tmp = []
+        #         self.secondary_loss_tmp = []
+        # loss = primary_loss + 1.0 * secondary_loss
+        # return (loss, model_outputs) if return_outputs else loss
+        return super().compute_loss(model, inputs, return_outputs=return_outputs)
 
 
 
