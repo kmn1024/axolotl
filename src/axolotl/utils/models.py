@@ -22,6 +22,7 @@ from transformers import (  # noqa: F401
     PreTrainedTokenizerBase,
 )
 
+from axolotl.monkeypatch.medusa_utils import replace_compute_loss, add_medusa_heads, replace_create_optimizer
 from axolotl.prompt_tokenizers import LLAMA_DEFAULT_EOS_TOKEN
 from axolotl.utils.bench import log_gpu_memory_usage
 from axolotl.utils.dict import DictDefault
@@ -448,6 +449,37 @@ def load_model(
                 if hasattr(module, "weight"):
                     module.to(cfg.torch_dtype)
 
+    # Add support for Medusa (https://github.com/FasterDecoding/Medusa)
+    if cfg.medusa_num_heads is not None:
+        LOG.info(f"using Medusa with {cfg.medusa_num_heads} heads, {cfg.medusa_num_layers} layers, {cfg.medusa_decay_coefficient} decay coefficient, {cfg.medusa_heads_coefficient} heads coefficient, {cfg.medusa_scheduler} scheduler, {cfg.medusa_logging} logging")
+
+        add_medusa_heads(
+            model,
+            medusa_num_heads=cfg.medusa_num_heads,
+            medusa_num_layers=cfg.medusa_num_layers,
+        )
+        # Only training heads.
+        for param in model.parameters():
+            param.requires_grad = False
+        for param in model.medusa_head.parameters():
+            param.requires_grad = True
+        if cfg.medusa_num_unfreeze_layers > 0:
+            for layer in model.model.layers[-cfg.medusa_num_unfreeze_layers:]:
+                LOG.info(f"Unfreezing layer {layer}")
+                for param in layer.parameters():
+                    param.requires_grad = True
+            for param in model.lm_head.parameters():
+                param.requires_grad = True
+        replace_compute_loss(
+            medusa_decay_coefficient=cfg.medusa_decay_coefficient,
+            medusa_logging=cfg.medusa_logging,
+        )
+        if cfg.medusa_lr_multiplier != 1:
+            LOG.info(f"Using Medusa LR multiplier {cfg.medusa_lr_multiplier}")
+            replace_create_optimizer(
+                medusa_lr_multiplier=cfg.medusa_lr_multiplier,
+            )
+    
     model, lora_config = load_adapter(model, cfg, cfg.adapter)
 
     if cfg.ddp and not load_in_8bit:

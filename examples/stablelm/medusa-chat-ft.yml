@@ -1,0 +1,86 @@
+base_model: /workspace/home/ck/Downloads/models
+base_model_config: /workspace/home/ck/Downloads/models
+model_type: StableLMEpochForCausalLM
+tokenizer_type: AutoTokenizer
+trust_remote_code: true
+
+load_in_8bit: false
+load_in_4bit: false
+strict: false
+
+local_streaming_datasets: True
+dataset_columns:
+  - 'conversations'
+datasets:
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat_sharded/'
+    name: 'chat_interrupt'
+    type: pygmalion_interrupt
+    ds_type: 'json'
+eval_datasets:
+  - path: '/workspace/home/ck/Downloads/convo_pygmalion_chat_eval_sharded/'
+    name: 'final_256_eval_jsonl'
+    type: pygmalion
+    ds_type: 'json'
+
+
+dataset_prepared_path: /workspace/dataset_prepared_path
+output_dir: /workspace/stablelm-3b-chat-medusa
+
+sequence_len: 4096
+sample_packing: true
+eval_sample_packing: true
+pad_to_sequence_len: true
+
+wandb_project: stablelm-3b-chat-medusa
+wandb_entity:
+wandb_watch:
+wandb_run_id:
+wandb_log_model:
+
+dataloader_num_workers: 12
+gradient_accumulation_steps: 8
+micro_batch_size: 8
+optimizer: adamw_torch
+adam_beta1: 0.9
+adam_beta2: 0.95
+adam_epsilon: 0.000001  # 0.00001 for better stability
+lr_scheduler: cosine
+learning_rate: 1e-3
+weight_decay: 0.0
+max_grad_norm: 1.0
+
+train_on_inputs: false
+group_by_length: false
+bf16: true
+fp16: false
+tf32: false
+
+gradient_checkpointing: true
+early_stopping_patience:
+resume_from_checkpoint:
+local_rank:
+xformers_attention:
+flash_attention: true
+
+max_steps: 580  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps * GPUs) = (332232000/5.5) / (4096*6*2*2)
+logging_steps: 2
+warmup_steps: 20
+save_steps: 0.05  # 1 / epochs
+eval_steps: 10
+
+val_set_size: 0
+eval_table_size:
+eval_table_max_new_tokens:
+debug:
+deepspeed: deepspeed/zero2.json
+fsdp:
+fsdp_config:
+tokens:
+  - "<|system|>"
+  - "<|user|>"
+  - "<|model|>"
+
+medusa_num_heads: 5
+medusa_num_layers: 1
+medusa_decay_coefficient: 1
+medusa_logging: true
