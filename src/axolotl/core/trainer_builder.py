@@ -335,6 +335,7 @@ class AxolotlTrainer(Trainer):
                 if self.primary_loss_tmp and len(self.primary_loss_tmp) % (self.args.gradient_accumulation_steps * self.args.logging_steps) == 0:
                     step_primary_loss = np.mean(self.primary_loss_tmp)
                     step_secondary_loss = np.mean(self.secondary_loss_tmp)
+                    LOG.info(f'train_primary_loss:{step_primary_loss}, train_secondary_loss:{step_secondary_loss}')
                     wandb.log({"train/primary_loss": step_primary_loss, "train/secondary_loss": step_secondary_loss})
                     self.primary_loss_tmp = []
                     self.secondary_loss_tmp = []
