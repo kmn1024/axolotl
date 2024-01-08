@@ -59,45 +59,49 @@ class CandidatePenaltyCrossEntropyCriterion():
         self.padding_idx = tokenizer.pad_token_id
         self.IGNORE_TOKEN_ID = -100  # Copied from prompt_strategies
 
-    def forward(self, inputs, pred_logits):
-        target = inputs['labels']
-        shift_targets = target[..., 1:].contiguous()
-        shift_targets = shift_targets.view(-1)
-        shift_targets = shift_targets.masked_fill(shift_targets == self.IGNORE_TOKEN_ID, self.padding_idx)
-        mask_ignore = shift_targets != self.padding_idx
-        shift_targets = shift_targets[mask_ignore]
+    def forward(self, batched_inputs, batched_pred_logits):
+        batched_labels = batched_inputs['labels']
+        B, seq_len = batched_labels.shape
+        B2, seq_len2, vocab_size2 = batched_pred_logits.shape
+        assert B == B2 and seq_len == seq_len2, f'{batched_labels.shape}, {batched_labels.shape}'
+        unliklihood_loss = torch.tensor([0] * B, dtype=torch.float)
+        for i in range(B):
+            target = batched_labels[i]
+            shift_targets = target[..., 1:].contiguous()
+            shift_targets = shift_targets.masked_fill(shift_targets == self.IGNORE_TOKEN_ID, self.padding_idx)
+            mask_ignore = shift_targets != self.padding_idx
+            shift_targets = shift_targets[mask_ignore]
 
-        shift_logits = pred_logits[..., :-1, :].contiguous()
-        shift_lprobs = F.log_softmax(shift_logits, dim=-1)
-        shift_lprobs = shift_lprobs.view(-1, shift_lprobs.size(-1))
-        shift_lprobs = shift_lprobs[mask_ignore]
+            shift_logits = batched_pred_logits[i][..., :-1, :].contiguous()
+            shift_lprobs = F.log_softmax(shift_logits, dim=-1)
+            shift_lprobs = shift_lprobs.view(-1, shift_lprobs.size(-1))
+            shift_lprobs = shift_lprobs[mask_ignore]
 
-        # # Sanity check that this is the same as primary_loss.
-        # sanity_mle_loss = F.nll_loss(
-        #     shift_lprobs,
-        #     shift_targets,
-        #     reduction='mean')
+            # # Sanity check that this is the same as primary_loss.
+            # sanity_mle_loss = F.nll_loss(
+            #     shift_lprobs,
+            #     shift_targets,
+            #     reduction='mean')
 
-        # -- unliklihood loss
-        # Maximize (1 - p(x_nt)) for negative target tokens x_nt (equivalently minimize -log(1-p(x_nt)))
+            # -- unliklihood loss
+            # Maximize (1 - p(x_nt)) for negative target tokens x_nt (equivalently minimize -log(1-p(x_nt)))
 
-        # - form negative targets
-        with torch.no_grad():
-            # E.g. DABCC | D | EFFGD => {A,B,C} are negative targets.
-            # Make 'the triangle'.
-            # There's still a bug since we have packed batches: https://github.com/facebookresearch/unlikelihood_training/issues/11#issue-1630788451
-            ctx_cands = shift_targets.unsqueeze(0).repeat(shift_targets.size(0), 1)
-            rows, cols = torch.triu_indices(shift_targets.size(0), shift_targets.size(0))
-            ctx_cands[rows, cols] = self.padding_idx
-            # Don't include the target for that timestep as a negative target.
-            ctx_cands = ctx_cands.masked_fill(ctx_cands == shift_targets.unsqueeze(1), self.padding_idx)
-            negative_targets = torch.zeros_like(shift_lprobs).scatter_(1, ctx_cands, 1)
+            # - form negative targets
+            with torch.no_grad():
+                # E.g. DABCC | D | EFFGD => {A,B,C} are negative targets.
+                # Make 'the triangle'.
+                ctx_cands = shift_targets.unsqueeze(0).repeat(shift_targets.size(0), 1)
+                rows, cols = torch.triu_indices(shift_targets.size(0), shift_targets.size(0))
+                ctx_cands[rows, cols] = self.padding_idx
+                # Don't include the target for that timestep as a negative target.
+                ctx_cands = ctx_cands.masked_fill(ctx_cands == shift_targets.unsqueeze(1), self.padding_idx)
+                negative_targets = torch.zeros_like(shift_lprobs).scatter_(1, ctx_cands, 1)
 
-        # - compute loss
-        one_minus_probs = torch.clamp((1.0 - shift_lprobs.exp()), min=1e-5)
-        unliklihood_loss = -torch.log(one_minus_probs)*negative_targets
-        unliklihood_loss = unliklihood_loss.sum(1).mean()
-        return unliklihood_loss
+            # - compute loss
+            one_minus_probs = torch.clamp((1.0 - shift_lprobs.exp()), min=1e-5)
+            unliklihood_loss = -torch.log(one_minus_probs)*negative_targets
+            unliklihood_loss[i] = unliklihood_loss.sum(1).mean()
+        return unliklihood_loss.mean()
 
 
 @dataclass
@@ -175,6 +179,7 @@ class AxolotlTrainer(Trainer):
     def __init__(self, *args, bench_data_collator=None, **kwargs):
         self.bench_data_collator = bench_data_collator
         self.primary_loss_tmp, self.secondary_loss_tmp = [], []
+        self.is_accumulating_eval = False
         super().__init__(*args, **kwargs)
 
     def create_scheduler(
@@ -309,22 +314,40 @@ class AxolotlTrainer(Trainer):
         # return self.accelerator.prepare(DataLoader(bench_dataset, **dataloader_params))
 
     def compute_loss(self, model, inputs, return_outputs=False):
-        # primary_loss, model_outputs = super().compute_loss(model, inputs, return_outputs=True)
-        # candidate_penalty = CandidatePenaltyCrossEntropyCriterion(self.tokenizer)
-        # secondary_loss = candidate_penalty.forward(inputs, model_outputs['logits'])
-        # if model.training and is_main_process():  # Ugly, should put into callback.
-        #     self.primary_loss_tmp.append(primary_loss.data.item())
-        #     self.secondary_loss_tmp.append(secondary_loss.data.item())
-        #     if self.primary_loss_tmp and len(self.primary_loss_tmp) % (self.args.gradient_accumulation_steps * self.args.logging_steps) == 0:
-        #         step_primary_loss = np.mean(self.primary_loss_tmp)
-        #         step_secondary_loss = np.mean(self.secondary_loss_tmp)
-        #         LOG.info(f'primary_loss:{step_primary_loss}, secondary_loss:{step_secondary_loss}')
-        #         wandb.log({"primary_loss": step_primary_loss, "secondary_loss": step_secondary_loss})
-        #         self.primary_loss_tmp = []
-        #         self.secondary_loss_tmp = []
-        # loss = primary_loss + 1.0 * secondary_loss
-        # return (loss, model_outputs) if return_outputs else loss
-        return super().compute_loss(model, inputs, return_outputs=return_outputs)
+        primary_loss, model_outputs = super().compute_loss(model, inputs, return_outputs=True)
+        candidate_penalty = CandidatePenaltyCrossEntropyCriterion(self.tokenizer)
+        secondary_loss = candidate_penalty.forward(inputs, model_outputs['logits'])
+        loss = primary_loss + 1.0 * secondary_loss
+        if is_main_process():
+            if model.training:
+                if self.is_accumulating_eval:
+                    # Just finished eval loop.
+                    assert self.primary_loss_tmp, 'Should not be empty!'
+                    step_primary_loss = np.mean(self.primary_loss_tmp)
+                    step_secondary_loss = np.mean(self.secondary_loss_tmp)
+                    LOG.info(f'eval_primary_loss:{step_primary_loss}, eval_secondary_loss:{step_secondary_loss}')
+                    wandb.log({"eval/primary_loss": step_primary_loss, "eval/secondary_loss": step_secondary_loss})
+                    self.primary_loss_tmp = []
+                    self.secondary_loss_tmp = []
+                    self.is_accumulating_eval = False
+                self.primary_loss_tmp.append(primary_loss.data.item())
+                self.secondary_loss_tmp.append(secondary_loss.data.item())
+                if self.primary_loss_tmp and len(self.primary_loss_tmp) % (self.args.gradient_accumulation_steps * self.args.logging_steps) == 0:
+                    step_primary_loss = np.mean(self.primary_loss_tmp)
+                    step_secondary_loss = np.mean(self.secondary_loss_tmp)
+                    wandb.log({"train/primary_loss": step_primary_loss, "train/secondary_loss": step_secondary_loss})
+                    self.primary_loss_tmp = []
+                    self.secondary_loss_tmp = []
+            else:
+                if not self.is_accumulating_eval:
+                    # Just finished training loop. We may miss a small number of training logs here, who cares.
+                    self.primary_loss_tmp = []
+                    self.secondary_loss_tmp = []
+                    self.is_accumulating_eval = True
+                self.primary_loss_tmp.append(primary_loss.data.item())
+                self.secondary_loss_tmp.append(secondary_loss.data.item())
+        return (loss, model_outputs) if return_outputs else loss
+        #return super().compute_loss(model, inputs, return_outputs=return_outputs)
 
 
 
