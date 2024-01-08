@@ -100,7 +100,7 @@ class CandidatePenaltyCrossEntropyCriterion():
             # - compute loss
             one_minus_probs = torch.clamp((1.0 - shift_lprobs.exp()), min=1e-5)
             unliklihood_loss = -torch.log(one_minus_probs)*negative_targets
-            unliklihood_loss[i] = unliklihood_loss.sum(1).mean()
+            unliklihood_loss[i] = unliklihood_loss.sum(1).sum()
         return unliklihood_loss.mean()
 
 
