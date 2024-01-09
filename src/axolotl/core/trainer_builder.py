@@ -64,7 +64,7 @@ class CandidatePenaltyCrossEntropyCriterion():
         B, seq_len = batched_labels.shape
         B2, seq_len2, vocab_size2 = batched_pred_logits.shape
         assert B == B2 and seq_len == seq_len2, f'{batched_labels.shape}, {batched_labels.shape}'
-        unliklihood_loss = torch.tensor([0] * B, dtype=torch.float)
+        unliklihood_losses = torch.tensor([0] * B, dtype=torch.float)
         for i in range(B):
             target = batched_labels[i]
             shift_targets = target[..., 1:].contiguous()
@@ -100,8 +100,8 @@ class CandidatePenaltyCrossEntropyCriterion():
             # - compute loss
             one_minus_probs = torch.clamp((1.0 - shift_lprobs.exp()), min=1e-5)
             unliklihood_loss = -torch.log(one_minus_probs)*negative_targets
-            unliklihood_loss[i] = unliklihood_loss.sum(1).sum()
-        return unliklihood_loss.mean()
+            unliklihood_losses[i] = unliklihood_loss.sum(1).mean()
+        return unliklihood_losses.mean()
 
 
 @dataclass
