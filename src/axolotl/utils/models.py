@@ -252,13 +252,18 @@ def load_model(
             bnb_4bit_quant_type="nf4",
         )
     # sample packing uses custom FA2 patch
-    if cfg.flash_attention and not cfg.sample_packing:
-        if (
-            cfg.is_llama_derived_model
-            or cfg.is_falcon_derived_model
-            or cfg.is_mistral_derived_model
-        ):
-            model_kwargs["use_flash_attention_2"] = True
+    if cfg.flash_attention:
+        if not cfg.sample_packing:
+            if (
+                cfg.is_llama_derived_model
+                or cfg.is_falcon_derived_model
+                or cfg.is_mistral_derived_model
+            ):
+                model_kwargs["use_flash_attention_2"] = True
+        if model_config.model_type == "phi-msft":
+            model_config.flash_attn = True
+            model_config.flash_rotary = True
+            model_config.fused_dense = True
 
     try:
         if cfg.is_llama_derived_model and not cfg.trust_remote_code and not cfg.gptq:
@@ -318,11 +323,12 @@ def load_model(
         #         device=cfg.device,
         #     )
         #     model.train() # sets to train instead of eval mode
-        elif model_type == "MixFormerSequentialForCausalLM":
-            from axolotl.models.phi import MixFormerSequentialForCausalLM
+        elif model_type == "PhiForCausalLM" or model_config.model_type == "phi-msft":
+            from axolotl.models.phi import PhiForCausalLM
 
-            model = MixFormerSequentialForCausalLM.from_pretrained(
+            model = PhiForCausalLM.from_pretrained(
                 base_model,
+                config=model_config,
                 load_in_8bit=cfg.load_in_8bit and cfg.adapter is not None,
                 load_in_4bit=cfg.load_in_4bit and cfg.adapter is not None,
                 **model_kwargs,
