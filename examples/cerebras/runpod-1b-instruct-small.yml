@@ -46,7 +46,7 @@ wandb_log_model:
 
 dataloader_num_workers: 1
 gradient_accumulation_steps: 2
-micro_batch_size: 6
+micro_batch_size: 32  # A6000
 optimizer: adamw_torch
 adam_beta1: 0.9
 adam_beta2: 0.95

@@ -733,6 +733,7 @@ class HFCausalTrainerBuilder(TrainerBuilderBase):
                 **training_arguments_kwargs,
             )
         )
+        training_args.dispatch_batches = False
         training_args = self.hook_post_create_training_args(training_args)
         trainer_kwargs = {}
 
