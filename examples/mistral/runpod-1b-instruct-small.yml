@@ -1,7 +1,8 @@
 base_model: /workspace/home/ck/Downloads/models
 base_model_config: /workspace/home/ck/Downloads/models
-tokenizer_type: AutoTokenizer
-trust_remote_code: true
+model_type: MistralForCausalLM
+tokenizer_type: LlamaTokenizer
+is_mistral_derived_model: true
 
 load_in_8bit: false
 load_in_4bit: false
