@@ -31,14 +31,14 @@ eval_datasets:
     ds_type: 'json'
 
 dataset_prepared_path: /workspace/dataset_prepared_path
-output_dir: /workspace/tinymistral_stack_800m-chat
+output_dir: /workspace/tinymistral_900m-chat
 
-sequence_len: 2048
+sequence_len: 4096
 sample_packing: false
 eval_sample_packing: false
 pad_to_sequence_len: false
 
-wandb_project: tinymistral_stack_800m
+wandb_project: tinymistral_900m
 wandb_entity:
 wandb_watch:
 wandb_run_id:
@@ -53,6 +53,7 @@ adam_beta2: 0.95
 adam_eps: 0.000000005
 lr_scheduler: cosine
 learning_rate: 0.00005
+#learning_rate: 0.0002
 weight_decay: 0.1
 max_grad_norm: 1.0
 
@@ -74,6 +75,7 @@ logging_steps: 2  # max_steps * 0.002
 warmup_steps: 20  # max_steps * 0.02
 save_steps: 0.25  # 1 / epochs
 eval_steps: 36
+eval_batch_size: 1
 
 val_set_size: 0
 eval_table_size:

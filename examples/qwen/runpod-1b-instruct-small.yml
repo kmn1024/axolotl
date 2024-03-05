@@ -1,7 +1,6 @@
 base_model: /workspace/home/ck/Downloads/models
 base_model_config: /workspace/home/ck/Downloads/models
 tokenizer_type: AutoTokenizer
-trust_remote_code: true
 
 load_in_8bit: false
 load_in_4bit: false
@@ -31,14 +30,14 @@ eval_datasets:
     ds_type: 'json'
 
 dataset_prepared_path: /workspace/dataset_prepared_path
-output_dir: /workspace/qwen_500m_stack_720m-chat
+output_dir: /workspace/qwen_500m_interleave_700m-chat
 
-sequence_len: 2048
+sequence_len: 4096
 sample_packing: false
 eval_sample_packing: false
 pad_to_sequence_len: false
 
-wandb_project: qwen_500m_stack_720m
+wandb_project: qwen_500m_interleave_700m
 wandb_entity:
 wandb_watch:
 wandb_run_id:
@@ -74,6 +73,7 @@ logging_steps: 2  # max_steps * 0.002
 warmup_steps: 20  # max_steps * 0.02
 save_steps: 0.25  # 1 / epochs
 eval_steps: 36
+eval_batch_size: 1
 
 val_set_size: 0
 eval_table_size:

@@ -31,14 +31,14 @@ eval_datasets:
     ds_type: 'json'
 
 dataset_prepared_path: /workspace/dataset_prepared_path
-output_dir: /workspace/cerebras_590m_stack_1.1b-chat
+output_dir: /workspace/cerebras_590m_stack_1b_32l-chat
 
 sequence_len: 2048
 sample_packing: false
 eval_sample_packing: false
 pad_to_sequence_len: false
 
-wandb_project: cerebras_590m_stack_1.1b
+wandb_project: cerebras_590m_stack_1b_32l
 wandb_entity:
 wandb_watch:
 wandb_run_id:
@@ -74,6 +74,7 @@ logging_steps: 2  # max_steps * 0.002
 warmup_steps: 20  # max_steps * 0.02
 save_steps: 0.25  # 1 / epochs
 eval_steps: 36
+eval_batch_size: 1
 
 val_set_size: 0
 eval_table_size:
