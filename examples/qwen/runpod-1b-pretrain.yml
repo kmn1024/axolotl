@@ -1,0 +1,75 @@
+base_model: /workspace/home/ck/Downloads/models
+base_model_config: /workspace/home/ck/Downloads/models
+tokenizer_type: AutoTokenizer
+
+load_in_8bit: false
+load_in_4bit: false
+strict: false
+
+local_streaming_datasets: True
+dataset_columns:
+  - 'text'
+ordered_datasets: False
+datasets:
+  - path: '/workspace/home/ck/Downloads/data/'
+    name: 'pile'
+    type: completion
+    ds_type: 'parquet'
+
+dataset_prepared_path: /workspace/dataset_prepared_path
+output_dir: /workspace/qwen_500m_interleave_700m-chat
+
+sequence_len: 4096
+sample_packing: false
+eval_sample_packing: false
+pad_to_sequence_len: false
+
+wandb_project: qwen_500m_interleave_700m
+wandb_entity:
+wandb_watch:
+wandb_run_id:
+wandb_log_model:
+
+dataloader_num_workers: 1
+gradient_accumulation_steps: 1
+micro_batch_size: 64  # A6000
+optimizer: adamw_torch
+adam_beta1: 0.9
+adam_beta2: 0.95
+adam_eps: 0.000000005
+lr_scheduler: cosine
+learning_rate: 0.0002
+weight_decay: 0.1
+max_grad_norm: 1.0
+
+train_on_inputs: false
+group_by_length: false
+bf16: true
+fp16: false
+tf32: false
+
+gradient_checkpointing: true
+early_stopping_patience:
+resume_from_checkpoint:
+local_rank:
+xformers_attention:
+flash_attention: true
+
+max_steps: 720  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps*GPUs) = 5847355 / (4096*6*2*2)
+logging_steps: 2  # max_steps * 0.002
+warmup_steps: 20  # max_steps * 0.02
+save_steps: 0.25  # 1 / epochs
+eval_steps:
+eval_batch_size:
+
+val_set_size: 0
+eval_table_size:
+eval_table_max_new_tokens:
+debug:
+deepspeed: deepspeed/zero2_cosine.json
+fsdp:
+fsdp_config:
+tokens:
+  - "<|system|>"
+  - "<|user|>"
+  - "<|model|>"
