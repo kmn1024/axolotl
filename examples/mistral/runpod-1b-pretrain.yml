@@ -1,6 +1,7 @@
 base_model: /workspace/home/ck/Downloads/models
 base_model_config: /workspace/home/ck/Downloads/models
 tokenizer_type: AutoTokenizer
+is_mistral_derived_model: true
 
 load_in_8bit: false
 load_in_4bit: false
@@ -17,14 +18,14 @@ datasets:
     ds_type: 'parquet'
 
 dataset_prepared_path: /workspace/dataset_prepared_path
-output_dir: /workspace/qwen_500m_interleave_700m-pretrain
+output_dir: /workspace/tinymistral_900m-pretrain
 
 sequence_len: 4096
 sample_packing: false
 eval_sample_packing: false
 pad_to_sequence_len: false
 
-wandb_project: qwen_500m_interleave_700m
+wandb_project: tinymistral_900m
 wandb_entity:
 wandb_watch:
 wandb_run_id:
@@ -38,7 +39,8 @@ adam_beta1: 0.9
 adam_beta2: 0.95
 adam_eps: 0.000000005
 lr_scheduler: cosine
-learning_rate: 0.0002
+learning_rate: 0.00005
+#learning_rate: 0.0002
 weight_decay: 0.1
 max_grad_norm: 1.0
 
@@ -69,6 +71,11 @@ debug:
 deepspeed: deepspeed/zero2_cosine.json
 fsdp:
 fsdp_config:
+special_tokens:
+  pad_token: "<pad>"  # Try "<unk>"?
+  bos_token: "<s>"
+  eos_token: "</s>"
+  unk_token: "<unk>"
 tokens:
   - "<|system|>"
   - "<|user|>"
