@@ -94,6 +94,8 @@ class Perturber:
     def perturb_text(self, text, perturb_prob_factor=1.0, skip_perterb_prob=999):
         if self.disable:
             return text
+        if len(text) >= (self.nlp.max_length - 1):
+            return text
         if skip_perterb_prob < 1 and random.random() <= skip_perterb_prob:
             return text
         if text == '':
