@@ -31,7 +31,7 @@ wandb_watch:
 wandb_run_id:
 wandb_log_model:
 
-dataloader_num_workers: 15
+dataloader_num_workers: 3
 #gradient_accumulation_steps: 3
 #micro_batch_size: 24  # only primary loss, A100
 gradient_accumulation_steps: 4
@@ -62,7 +62,7 @@ flash_attention: true
 max_steps: 70000  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps*GPUs) = 5847355 / (4096*6*2*2)
 logging_steps: 7  # max_steps * 0.002
 warmup_steps: 1000  # max_steps * 0.02
-save_steps: 0.035  # 1 / epochs
+save_steps: 0.02  # 1 / epochs
 
 # # Testing
 # max_steps: 700  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps*GPUs) = 5847355 / (4096*6*2*2)
