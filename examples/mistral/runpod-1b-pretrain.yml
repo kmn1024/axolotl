@@ -18,29 +18,31 @@ datasets:
     ds_type: 'parquet'
 
 dataset_prepared_path: /workspace/dataset_prepared_path
-output_dir: /workspace/tinymistral_900m-pretrain
+output_dir: /workspace/tinymistral_870m-pretrain
 
 sequence_len: 4096
 sample_packing: false
 eval_sample_packing: false
 pad_to_sequence_len: false
 
-wandb_project: tinymistral_900m
+wandb_project: tinymistral_870m
 wandb_entity:
 wandb_watch:
 wandb_run_id:
 wandb_log_model:
 
 dataloader_num_workers: 15
-gradient_accumulation_steps: 16
-micro_batch_size: 4 
+#gradient_accumulation_steps: 3
+#micro_batch_size: 24  # only primary loss, A100
+gradient_accumulation_steps: 4
+micro_batch_size: 16  # only primary loss, A6000
 optimizer: adamw_torch
 adam_beta1: 0.9
 adam_beta2: 0.95
 adam_eps: 0.000000005
 lr_scheduler: cosine
-learning_rate: 0.00005
-#learning_rate: 0.0002
+#learning_rate: 0.00005
+learning_rate: 0.0002
 weight_decay: 0.1
 max_grad_norm: 1.0
 
@@ -61,6 +63,13 @@ max_steps: 70000  # Must for streaming. epochs * steps_per_epoch. steps_per_epoc
 logging_steps: 7  # max_steps * 0.002
 warmup_steps: 1000  # max_steps * 0.02
 save_steps: 0.035  # 1 / epochs
+
+# # Testing
+# max_steps: 700  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps*GPUs) = 5847355 / (4096*6*2*2)
+# logging_steps: 1  # max_steps * 0.002
+# warmup_steps: 20  # max_steps * 0.02
+# save_steps: 0.1  # 1 / epochs
+
 eval_steps:
 eval_batch_size:
 
