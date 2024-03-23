@@ -33,7 +33,7 @@ wandb_log_model:
 
 #dataloader_num_workers: 16
 #gradient_accumulation_steps: 3
-#micro_batch_size: 22  # only primary loss, H100
+#micro_batch_size: 26  # only primary loss, A100
 dataloader_num_workers: 1
 gradient_accumulation_steps: 3
 micro_batch_size: 16  # only primary loss, A6000
@@ -60,7 +60,12 @@ local_rank:
 xformers_attention:
 flash_attention: true
 
-max_steps: 70000  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps*GPUs) = 5847355 / (4096*6*2*2)
+#A100
+#max_steps: 58000  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps*GPUs) = 5847355 / (4096*6*2*2)
+#logging_steps: 6  # max_steps * 0.002
+#warmup_steps: 900  # max_steps * 0.02
+
+max_steps: 75000  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps*GPUs) = 5847355 / (4096*6*2*2)
 logging_steps: 7  # max_steps * 0.002
 warmup_steps: 1000  # max_steps * 0.02
 save_steps: 0.02  # 1 / epochs
