@@ -12,12 +12,12 @@ dataset_columns:
   - 'text'
 ordered_datasets: False
 datasets:
-  - path: '/workspace/home/ck/Downloads/data/'
+  - path: '/home/ck/Downloads/data/'
     name: 'pile'
     type: completion
     ds_type: 'parquet'
 
-dataset_prepared_path: /workspace/dataset_prepared_path
+dataset_prepared_path: /dataset_prepared_path
 output_dir: /workspace/tinymistral_870m-pretrain
 
 sequence_len: 4096
@@ -31,10 +31,11 @@ wandb_watch:
 wandb_run_id:
 wandb_log_model:
 
-dataloader_num_workers: 3
+#dataloader_num_workers: 16
 #gradient_accumulation_steps: 3
-#micro_batch_size: 24  # only primary loss, A100
-gradient_accumulation_steps: 4
+#micro_batch_size: 22  # only primary loss, H100
+dataloader_num_workers: 1
+gradient_accumulation_steps: 3
 micro_batch_size: 16  # only primary loss, A6000
 optimizer: adamw_torch
 adam_beta1: 0.9
