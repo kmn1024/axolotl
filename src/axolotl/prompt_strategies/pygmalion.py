@@ -54,7 +54,7 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
                     if message.endswith("\n<START>"):
                         message = message[:-8]
                     system_res = self._tokenize(
-                        prefix + "Persona: " + message.strip(),
+                        prefix + message.strip(),
                         add_eos_token=False,
                         strip_bos_token=False,
                     )
