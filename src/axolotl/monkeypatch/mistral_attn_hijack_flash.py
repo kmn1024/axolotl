@@ -94,7 +94,7 @@ def _prepare_decoder_attention_mask(
     sliding_window,
 ):  # pylint: disable=unused-argument
     # [bsz, seq_len]
-    if attention_mask is None:
+    if attention_mask is None or sliding_window is None:
         return attention_mask
 
     # NOTE: attention mask and sliding masks are only broadcastable in certain scenarios.
@@ -151,7 +151,7 @@ def flashattn_forward(
     )
 
     use_sliding_windows = (
-        hasattr(self.config, "sliding_window") is not None
+        getattr(self.config, "sliding_window") is not None
         and kv_seq_len > self.config.sliding_window
     )
 
@@ -200,6 +200,8 @@ def flashattn_forward(
         # turn off FA causal mask after first inference autoregressive iteration
         # only on first autoregressive step q,k,v have same seqlen
         is_causal = key_states.shape == query_states.shape
+        
+    dropout_rate = 0.0 if not self.training else getattr(self, "attention_dropout", 0.0)
 
     if cu_seqlens is not None and max_seqlen is not None and cu_seqlens.dim() == 1:
         # special handling using sample packing
@@ -213,7 +215,7 @@ def flashattn_forward(
             qkv,
             cu_seqlens,
             max_seqlen,
-            0.0,
+            dropout_p=dropout_rate,
             softmax_scale=None,
             causal=True,
             window_size=window_size,
@@ -239,7 +241,7 @@ def flashattn_forward(
             qkv_unpad,
             cu_seqlens_q,
             max_seqlen_q,
-            0.0,
+            dropout_p=dropout_rate,
             softmax_scale=None,
             causal=is_causal,
             window_size=window_size,
@@ -286,7 +288,7 @@ def flashattn_forward(
                 cu_seqlens_k,
                 max_seqlen_q,
                 max_seqlen_k,
-                0.0,
+                dropout_p=dropout_rate,
                 softmax_scale=None,
                 causal=is_causal,
                 window_size=window_size,
