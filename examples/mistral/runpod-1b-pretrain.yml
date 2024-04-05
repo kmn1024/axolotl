@@ -18,14 +18,14 @@ datasets:
     ds_type: 'parquet'
 
 dataset_prepared_path: /dataset_prepared_path
-output_dir: /workspace/tinymistral_870m-pretrain
+output_dir: /workspace/tinymistral_950m-pretrain_refinedweb
 
 sequence_len: 4096
-sample_packing: false
+sample_packing: true
 eval_sample_packing: false
-pad_to_sequence_len: false
+pad_to_sequence_len: true
 
-wandb_project: tinymistral_870m
+wandb_project: tinymistral_950m_refinedweb
 wandb_entity:
 wandb_watch:
 wandb_run_id:
@@ -36,7 +36,7 @@ wandb_log_model:
 #micro_batch_size: 24  # only primary loss, A100
 dataloader_num_workers: 1
 gradient_accumulation_steps: 3
-micro_batch_size: 16  # only primary loss, A6000
+micro_batch_size: 8  # only primary loss, A6000
 optimizer: adamw_torch
 adam_beta1: 0.9
 adam_beta2: 0.95

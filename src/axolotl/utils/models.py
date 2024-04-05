@@ -260,6 +260,13 @@ def load_model(
                 or cfg.is_mistral_derived_model
             ):
                 model_kwargs["use_flash_attention_2"] = True
+        else:
+            if (
+                cfg.is_llama_derived_model
+                or cfg.is_falcon_derived_model
+                or cfg.is_mistral_derived_model
+            ):
+                model_config._attn_implementation = "eager"
         if model_config.model_type == "phi-msft":
             model_config.flash_attn = True
             model_config.flash_rotary = True
@@ -276,6 +283,7 @@ def load_model(
                 base_model_config,
                 **config_kwargs,
             )
+
             model = LlamaForCausalLM.from_pretrained(
                 base_model,
                 config=config,
@@ -325,7 +333,6 @@ def load_model(
         #     model.train() # sets to train instead of eval mode
         elif model_type == "PhiForCausalLM" or model_config.model_type == "phi-msft":
             from axolotl.models.phi import PhiForCausalLM
-
             model = PhiForCausalLM.from_pretrained(
                 base_model,
                 config=model_config,
@@ -372,14 +379,14 @@ def load_model(
             if cfg.gptq:
                 model = AutoModelForCausalLM.from_pretrained(
                     base_model,
-                    config=config,
+                    config=model_config,
                     trust_remote_code=cfg.trust_remote_code or False,
                     **model_kwargs,
                 )
             else:
                 model = AutoModelForCausalLM.from_pretrained(
                     base_model,
-                    config=config,
+                    config=model_config,
                     load_in_8bit=cfg.load_in_8bit and cfg.adapter is not None,
                     load_in_4bit=cfg.load_in_4bit and cfg.adapter is not None,
                     trust_remote_code=cfg.trust_remote_code or False,
