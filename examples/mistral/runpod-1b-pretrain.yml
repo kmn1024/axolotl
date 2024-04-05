@@ -21,9 +21,9 @@ dataset_prepared_path: /dataset_prepared_path
 output_dir: /workspace/tinymistral_950m-pretrain_refinedweb
 
 sequence_len: 4096
-sample_packing: true
+sample_packing: false
 eval_sample_packing: false
-pad_to_sequence_len: true
+pad_to_sequence_len: false
 
 wandb_project: tinymistral_950m_refinedweb
 wandb_entity:
@@ -31,12 +31,12 @@ wandb_watch:
 wandb_run_id:
 wandb_log_model:
 
-#dataloader_num_workers: 1  #2 for H100
+#dataloader_num_workers: 2
 #gradient_accumulation_steps: 3
-#micro_batch_size: 24  # only primary loss, A100
+#micro_batch_size: 26  # only primary loss, A100
 dataloader_num_workers: 1
 gradient_accumulation_steps: 3
-micro_batch_size: 8  # only primary loss, A6000
+micro_batch_size: 16  # only primary loss, A6000
 optimizer: adamw_torch
 adam_beta1: 0.9
 adam_beta2: 0.95
@@ -61,9 +61,9 @@ xformers_attention:
 flash_attention: true
 
 #A100
-#max_steps: 62500  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps*GPUs) = 5847355 / (4096*6*2*2)
-#logging_steps: 7  # max_steps * 0.002
-#warmup_steps: 900  # max_steps * 0.02
+#max_steps: 80000  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps*GPUs) = 5847355 / (4096*6*2*2)
+#logging_steps: 8  # max_steps * 0.002
+#warmup_steps: 640  # max_steps * 0.02
 
 max_steps: 75000  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps*GPUs) = 5847355 / (4096*6*2*2)
 logging_steps: 7  # max_steps * 0.002
