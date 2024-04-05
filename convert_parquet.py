@@ -10,7 +10,7 @@ def convert_parquet_file(parquet_file, compression='snappy'):
     print(f"Done: {parquet_file}")
 
 # Set the directory where your Parquet files are located                                                                                                                                                                                                                                  
-parquet_directory = Path('/home/ck/Downloads/refinedweb')
+parquet_directory = Path('/home/ck/Downloads/data')
 
 # Get a list of all Parquet files                                                                                                                                                                                                                                                         
 parquet_files = list(parquet_directory.glob('*.parquet'))
