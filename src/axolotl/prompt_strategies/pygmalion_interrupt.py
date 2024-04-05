@@ -102,7 +102,7 @@ class PygmalionInterruptPromptTokenizingStrategy(PromptTokenizingStrategy):
                         user_message, interrupted_message = message.strip(), ''
                     user_message = self.perturber.perturb_text(user_message)
                     user_res = self._tokenize(
-                        user_prefix + " " + user_message,
+                        user_prefix + user_message,
                         add_eos_token=False,
                         strip_bos_token=True,
                     )
@@ -111,7 +111,7 @@ class PygmalionInterruptPromptTokenizingStrategy(PromptTokenizingStrategy):
 
                     if should_interrupt:
                         bot_res = self._tokenize(
-                            f"{interrupted_message}<|model|> " + bot_message.strip(),
+                            f"{interrupted_message}<|model|>" + bot_message.strip(),
                             add_eos_token=True,
                             strip_bos_token=True,
                         )
@@ -121,7 +121,7 @@ class PygmalionInterruptPromptTokenizingStrategy(PromptTokenizingStrategy):
                     else:
                         bot_prefix = "<|model|>"
                         bot_res = self._tokenize(
-                            bot_prefix + " " + bot_message.strip(),
+                            bot_prefix + bot_message.strip(),
                             add_eos_token=True,
                             strip_bos_token=True,
                         )

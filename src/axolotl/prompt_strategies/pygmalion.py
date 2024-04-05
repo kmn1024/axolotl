@@ -88,7 +88,7 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
                     user_prefix = "<|user|>"
                     user_message = self.perturber.perturb_text(message.strip())
                     user_res = self._tokenize(
-                        user_prefix + " " + user_message,
+                        user_prefix + user_message,
                         add_eos_token=False,
                         strip_bos_token=True,
                     )
@@ -97,7 +97,7 @@ class PygmalionPromptTokenizingStrategy(PromptTokenizingStrategy):
 
                     bot_prefix = "<|model|>"
                     bot_res = self._tokenize(
-                        bot_prefix + " " + bot_message.strip(),
+                        bot_prefix + bot_message.strip(),
                         add_eos_token=True,
                         strip_bos_token=True,
                     )
