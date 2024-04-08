@@ -20,7 +20,7 @@ eval_datasets:
     type: pygmalion
     ds_type: 'json'
 
-dataset_prepared_path: /dataset_prepared_path
+dataset_prepared_path: /workspace/dataset_prepared_path
 output_dir: /workspace/tinymistral_950m-chat
 
 sequence_len: 4096
@@ -35,17 +35,17 @@ wandb_run_id:
 wandb_log_model:
 
 dataloader_num_workers: 1
-#gradient_accumulation_steps: 3
-#micro_batch_size: 26  # only primary loss, A100
-gradient_accumulation_steps: 3
-micro_batch_size: 16  # only primary loss, A6000
+#gradient_accumulation_steps: 8
+#micro_batch_size: 12  # only primary loss, A100
+gradient_accumulation_steps: 12
+micro_batch_size: 8  # only primary loss, A6000
 optimizer: adamw_torch
 adam_beta1: 0.9
 adam_beta2: 0.95
 adam_eps: 0.000000005
 lr_scheduler: cosine
-#learning_rate: 0.00005
-learning_rate: 0.0002
+#learning_rate: 0.0002  # pretraining rate
+learning_rate: 0.0001
 weight_decay: 0.1
 max_grad_norm: 1.0
 
@@ -62,13 +62,12 @@ local_rank:
 xformers_attention:
 flash_attention: true
 
-#A100
 num_epochs: 1
-logging_steps: 2
-warmup_steps: 90
+logging_steps: 4
+warmup_steps: 200
 save_steps: 0.1  # 1 / epochs
-eval_steps: 30
-eval_batch_size: 8
+eval_steps: 50
+eval_batch_size: 4
 
 val_set_size: 0
 eval_table_size:
