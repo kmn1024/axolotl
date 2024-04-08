@@ -78,8 +78,14 @@ def prepare_dataset(cfg, tokenizer):
     elif not cfg.pretraining_dataset:
         with zero_first(is_main_process()):
             train_dataset, eval_dataset = load_prepare_datasets(
-                tokenizer, cfg, DEFAULT_DATASET_PREPARED_PATH
+                tokenizer, cfg, cfg.datasets, DEFAULT_DATASET_PREPARED_PATH
             )
+            if cfg.eval_datasets:
+                assert eval_dataset is None
+                eval_dataset, dummy_dataset = load_prepare_datasets(
+                    tokenizer, cfg, cfg.eval_datasets, DEFAULT_DATASET_PREPARED_PATH
+                )
+                assert dummy_dataset is None
     else:
         train_dataset = load_pretraining_dataset(
             cfg.pretraining_dataset,
@@ -365,7 +371,7 @@ def load_tokenized_prepared_datasets_local_stream(
 
 
 def load_tokenized_prepared_datasets(
-    tokenizer, cfg, default_dataset_prepared_path
+    tokenizer, cfg, input_datasets, default_dataset_prepared_path
 ) -> DatasetDict:
     tokenizer_name = tokenizer.__class__.__name__
     ds_hash = str(
@@ -374,7 +380,7 @@ def load_tokenized_prepared_datasets(
                 str(cfg.sequence_len)
                 + "@"
                 + "|".join(
-                    sorted([f"{d.path}:{d.type}:{d.shards}" for d in cfg.datasets])
+                    sorted([f"{d.path}:{d.type}:{d.shards}" for d in input_datasets])
                 )
                 + "|"
                 + tokenizer_name
@@ -425,7 +431,7 @@ def load_tokenized_prepared_datasets(
                     yield dataset
 
         # pylint: disable=invalid-name
-        for d in for_d_in_datasets(cfg.datasets):
+        for d in for_d_in_datasets(input_datasets):
             ds: Union[Dataset, DatasetDict] = None
             ds_from_hub = False
             try:
@@ -536,6 +542,7 @@ def load_tokenized_prepared_datasets(
 def load_prepare_datasets(
     tokenizer: PreTrainedTokenizerBase,
     cfg,
+    input_datasets,
     default_dataset_prepared_path,
 ) -> Tuple[Dataset, Dataset]:
     max_packed_sequence_len = (
@@ -557,7 +564,7 @@ def load_prepare_datasets(
                     + str(max_packed_sequence_len)
                     + seed
                     + "|".join(
-                        sorted([f"{d.path}:{d.type}:{d.shards}" for d in cfg.datasets])
+                        sorted([f"{d.path}:{d.type}:{d.shards}" for d in input_datasets])
                     )
                     + "|"
                     + tokenizer_name
@@ -602,7 +609,7 @@ def load_prepare_datasets(
                 )
         else:
             dataset = load_tokenized_prepared_datasets(
-                tokenizer, cfg, default_dataset_prepared_path
+                tokenizer, cfg, input_datasets, default_dataset_prepared_path
             )
 
             if cfg.seed:
@@ -644,7 +651,7 @@ def load_prepare_datasets(
                     )
     else:
         dataset = load_tokenized_prepared_datasets(
-            tokenizer, cfg, default_dataset_prepared_path
+            tokenizer, cfg, input_datasets, default_dataset_prepared_path
         )
 
     if cfg.dataset_shard_num and cfg.dataset_shard_idx is not None:
