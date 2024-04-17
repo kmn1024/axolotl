@@ -14,7 +14,7 @@ def is_special_token(token):
     special_token_match = r'^<\|[^\s<|>]*\|>$'
     return re.match(special_token_match, token)
 
-def get_words_and_separators(text):
+def get_words_and_separators(nlp, text):
     special_token_split = r'(<\|[^\s<|>]*\|>)'
     special_token_parts = re.split(special_token_split, text)
     all_tokens, all_separators = [], []
