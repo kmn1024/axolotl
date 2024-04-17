@@ -4,29 +4,47 @@ import random
 import tarfile
 import unicodedata
 import os
+import re
 
 import numpy as np
 from unidecode import unidecode
 from nltk.corpus import words
 
-def get_words_and_separators(nlp, text):
-    tokens = [token.text for token in nlp(text)]
-    separators = []
+def is_special_token(token):
+    special_token_match = r'^<\|[^\s<|>]*\|>$'
+    return re.match(special_token_match, token)
+
+def get_words_and_separators(text):
+    special_token_split = r'(<\|[^\s<|>]*\|>)'
+    special_token_parts = re.split(special_token_split, text)
+    all_tokens, all_separators = [], []
     start = 0
-    for idx, token in enumerate(tokens):
-        # Find the position of the next token in the string, starting from 'start'
-        pos = text.find(token, start)
-        assert pos != -1, print(f'{text} \n {tokens} \n violating {idx}: {token}')
-        # Extract the separator: the part of the string before this token
-        if start != 0:
-            separator = text[start:pos]
-            separators.append(separator)
-        # Update 'start' to the end of the token
-        start = pos + len(token)
+    for part_idx, part in enumerate(special_token_parts):
+        if is_special_token(part):
+            tokens = [part]
+        else:
+            tokens = [token.text for token in nlp(part)]
+        separators = []
+        for token in tokens:
+            # Find the position of the next token in the string, starting from 'start'
+            pos = text.find(token, start)
+            assert pos != -1, print(f'{text} \n {tokens} \n violating {start}: {token}')
+            # Extract the separator: the part of the string before this token
+            if start != 0:
+                separator = text[start:pos]
+                separators.append(separator)
+            # Update 'start' to the end of the token
+            start = pos + len(token)
+        if part_idx == 0:
+            assert len(separators) == len(tokens) - 1, f'{part}. Tokens: {tokens}, Seps: {separators}'
+        else:
+            assert len(separators) == len(tokens), f'{part}. Tokens: {tokens}, Seps: {separators}'
+        all_tokens += tokens
+        all_separators += separators
     # Add the trailing separator, if any
-    separators.append(text[start:])
-    assert len(separators) == len(tokens), f'{text}. Tokens: {tokens}, Seps: {separators}'
-    return tokens, separators
+    all_separators.append(text[start:])
+    assert len(all_separators) == len(all_tokens), f'{text}. Tokens: {all_tokens}, Seps: {all_separators}'
+    return all_tokens, all_separators
 
 def transfer_capitalization(source_word, target_word):
     if source_word.istitle():  # If the source word is title cased (capitalized)
@@ -105,7 +123,7 @@ class Perturber:
         new_tokens, new_separators = [], []
         perturb_idx = 0
         for idx in range(len(tokens)):
-            if is_punctuation(tokens[idx]):
+            if is_punctuation(tokens[idx]) or is_special_token(tokens[idx]):
                 perturb = False
             else:
                 perturb_prob = self.perturb_schedule[perturb_idx] if perturb_idx < len(self.perturb_schedule) else self.perturb_schedule[-1]
