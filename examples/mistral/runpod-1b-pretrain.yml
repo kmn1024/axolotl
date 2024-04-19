@@ -1,4 +1,3 @@
-num_unfreeze_layers_for_new_vocab: 
 base_model: /workspace/home/ck/Downloads/models
 base_model_config: /workspace/home/ck/Downloads/models
 tokenizer_type: AutoTokenizer
@@ -32,12 +31,19 @@ wandb_watch:
 wandb_run_id:
 wandb_log_model:
 
+#dataloader_num_workers: 1
+#gradient_accumulation_steps: 12
+#micro_batch_size: 4  # only primary loss, A6000
+#num_unfreeze_layers_for_new_vocab: 3  # 100k vocab
+
 #dataloader_num_workers: 3  # feed H100
 #gradient_accumulation_steps: 3
 #micro_batch_size: 26  # only primary loss, A100
 dataloader_num_workers: 1
 gradient_accumulation_steps: 3
 micro_batch_size: 16  # only primary loss, A6000
+num_unfreeze_layers_for_new_vocab: 
+
 optimizer: adamw_torch
 adam_beta1: 0.9
 adam_beta2: 0.95
