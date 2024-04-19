@@ -25,7 +25,7 @@ from torch.optim.lr_scheduler import _LRScheduler, OneCycleLR
 from torch.utils.data import DataLoader, DistributedSampler, SequentialSampler
 from transformers import EarlyStoppingCallback, Trainer, TrainingArguments
 from transformers.trainer_pt_utils import SequentialDistributedSampler
-from transformers.trainer_utils import has_length
+from transformers.trainer_utils import has_length, seed_worker
 
 from axolotl.monkeypatch.relora import ReLoRACallback, ReLoRAScheduler
 from axolotl.utils.callbacks import (
@@ -253,7 +253,7 @@ class AxolotlTrainer(Trainer):
                                                        rank=self.args.process_index,
                                                        world_size=self.args.world_size)
             print(f'split_dataset_by_node shards: {self.train_dataset.n_shards}')
-            prefetch_factor = 2
+            prefetch_factor = 3
             return self.accelerator.prepare(
                 StreamingMultipackDistributedDataloaderNew(
                     self.train_dataset, self.data_collator,
@@ -263,7 +263,27 @@ class AxolotlTrainer(Trainer):
                 )
             )
         else:
-            return super().get_train_dataloader()
+            # Copied from transformers/trainer.py
+            # return super().get_train_dataloader()
+            train_dataset = self.train_dataset
+            data_collator = self.data_collator
+            if isinstance(train_dataset, Dataset):
+                train_dataset = self._remove_unused_columns(train_dataset, description="training")
+            else:
+                data_collator = self._get_collator_with_removed_columns(data_collator, description="training")
+            dataloader_params = {
+                "batch_size": self._train_batch_size,
+                "collate_fn": data_collator,
+                "num_workers": self.args.dataloader_num_workers,
+                "pin_memory": self.args.dataloader_pin_memory,
+                "prefetch_factor": 3,
+            }
+            if not isinstance(train_dataset, torch.utils.data.IterableDataset):
+                dataloader_params["sampler"] = self._get_train_sampler()
+                dataloader_params["drop_last"] = self.args.dataloader_drop_last
+                dataloader_params["worker_init_fn"] = seed_worker
+            return self.accelerator.prepare(DataLoader(train_dataset, **dataloader_params))
+
 
     def get_eval_dataloader(
         self, eval_dataset: Optional[Dataset] = None

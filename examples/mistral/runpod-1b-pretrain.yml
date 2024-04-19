@@ -31,7 +31,7 @@ wandb_watch:
 wandb_run_id:
 wandb_log_model:
 
-#dataloader_num_workers: 2
+#dataloader_num_workers: 3  # feed H100
 #gradient_accumulation_steps: 3
 #micro_batch_size: 26  # only primary loss, A100
 dataloader_num_workers: 1
