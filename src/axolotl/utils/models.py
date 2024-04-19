@@ -462,6 +462,23 @@ def load_model(
                 if hasattr(module, "weight"):
                     module.to(cfg.torch_dtype)
 
+    # Freeze for vocab adjustment first phase.
+    if cfg.num_unfreeze_layers_for_new_vocab is not None and cfg.num_unfreeze_layers_for_new_vocab > 0:
+        for param in model.parameters():
+            param.requires_grad = False
+        # Unfreeze the embedding layer (also unfreezes lm_head due to weight tying)
+        for param in model.model.embed_tokens.parameters():
+            param.requires_grad = True
+        # Unfreeze the first two and last two layers in the decoder
+        num_layers = len(model.model.layers)
+        layers_to_unfreeze = list(range(cfg.num_unfreeze_layers_for_new_vocab)) + list(range(num_layers - cfg.num_unfreeze_layers_for_new_vocab, num_layers))
+        print(f"Freezing layers to adjust vocab! Unfrozen layers: {layers_to_unfreeze}.")
+        for i in layers_to_unfreeze:
+            for param in model.model.layers[i].parameters():
+                param.requires_grad = True
+        for param in model.lm_head.parameters():
+            param.requires_grad = True
+
     # Add support for Medusa (https://github.com/FasterDecoding/Medusa)
     if cfg.medusa_num_heads is not None:
         LOG.info(f"using Medusa with {cfg.medusa_num_heads} heads, {cfg.medusa_num_layers} layers, {cfg.medusa_decay_coefficient} decay coefficient, {cfg.medusa_heads_coefficient} heads coefficient, {cfg.medusa_scheduler} scheduler, {cfg.medusa_logging} logging")

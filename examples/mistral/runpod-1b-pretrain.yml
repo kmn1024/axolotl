@@ -1,3 +1,4 @@
+num_unfreeze_layers_for_new_vocab: 
 base_model: /workspace/home/ck/Downloads/models
 base_model_config: /workspace/home/ck/Downloads/models
 tokenizer_type: AutoTokenizer
