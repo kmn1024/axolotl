@@ -88,3 +88,4 @@ tokens:
   - "<|biden|>"
   - "<|trump|>"
   - "<|silence|>"
+  - "<|stop|>"
