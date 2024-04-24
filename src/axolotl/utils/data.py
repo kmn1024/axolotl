@@ -224,9 +224,13 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
         if ds_strategy.supports_batched:
             map_kwargs["batched"] = True
             map_kwargs["batch_size"] = 8
+        remove_columns = cfg.dataset_columns
+        if cfg.dataset_remove_columns is not None:
+            remove_columns += cfg.dataset_remove_columns
+        print(f"Removing columns: {remove_columns}")
         ds = ds.map(
             ds_strategy.tokenize_prompt,
-            remove_columns=cfg.dataset_columns,
+            remove_columns=remove_columns,
             **map_kwargs,
         )
         return ds
