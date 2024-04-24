@@ -11,7 +11,7 @@ from unidecode import unidecode
 from nltk.corpus import words
 
 def is_special_token(token):
-    return token.startswith('<|') and token.endswith('|>')
+    return token.startswith('<|') and token.endswith('|>') and token.count(' ') == 0
 
 def get_words_and_separators(nlp, text):
     special_token_split = r'(<\|[^\s<|>]*\|>)'
