@@ -14,9 +14,13 @@ def is_special_token(token):
     return token.startswith('<|') and token.endswith('|>') and token.count(' ') == 0
 
 def get_words_and_separators(nlp, text):
-    special_token_split = r'(<\|[^\s<|>]*\|>)'
-    special_token_parts = re.split(special_token_split, text)
-    special_token_parts = [p for p in special_token_parts if len(p) != 0]
+    if '<|' in text and '|>' in text:
+        # A faster check to see if regexp split is necessary, which can be slow.
+        special_token_split = r'(<\|[^\s<|>]*\|>)'
+        special_token_parts = re.split(special_token_split, text)
+        special_token_parts = [p for p in special_token_parts if len(p) != 0]
+    else:
+        special_token_parts = [text]
     all_tokens, all_separators = [], []
     start = 0
     for part_idx, part in enumerate(special_token_parts):
