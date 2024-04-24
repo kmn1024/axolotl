@@ -64,7 +64,7 @@ class CandidatePenaltyCrossEntropyCriterion():
         B, seq_len = batched_labels.shape
         B2, seq_len2, vocab_size2 = batched_pred_logits.shape
         assert B == B2 and seq_len == seq_len2, f'{batched_labels.shape}, {batched_labels.shape}'
-        unliklihood_losses = torch.tensor([0] * B, dtype=torch.float)
+        unliklihood_losses = []
         for i in range(B):
             target = batched_labels[i]
             shift_targets = target[..., 1:].contiguous()
@@ -96,12 +96,19 @@ class CandidatePenaltyCrossEntropyCriterion():
                 # Don't include the target for that timestep as a negative target.
                 ctx_cands = ctx_cands.masked_fill(ctx_cands == shift_targets.unsqueeze(1), self.padding_idx)
                 negative_targets = torch.zeros_like(shift_lprobs).scatter_(1, ctx_cands, 1)
+            if negative_targets.numel() == 0:
+                # Sometimes, there are no negative targets (dupe input).
+                continue
 
             # - compute loss
             one_minus_probs = torch.clamp((1.0 - shift_lprobs.exp()), min=1e-5)
             unliklihood_loss = -torch.log(one_minus_probs)*negative_targets
-            unliklihood_losses[i] = unliklihood_loss.sum(1).mean()
-        return unliklihood_losses.mean()
+            unliklihood_loss = unliklihood_loss.sum(1).mean()
+            # assert not torch.isnan(unliklihood_loss).any(), (one_minus_probs, negative_targets)  # Expensive check.
+            unliklihood_losses.append(unliklihood_loss)
+        if len(unliklihood_losses) == 0:
+            return None
+        return torch.stack(unliklihood_losses).mean()
 
 
 @dataclass
@@ -337,7 +344,9 @@ class AxolotlTrainer(Trainer):
         primary_loss, model_outputs = super().compute_loss(model, inputs, return_outputs=True)
         candidate_penalty = CandidatePenaltyCrossEntropyCriterion(self.tokenizer)
         secondary_loss = candidate_penalty.forward(inputs, model_outputs['logits'])
-        loss = primary_loss + 1.0 * secondary_loss
+        loss = primary_loss
+        if secondary_loss is not None:
+            loss = primary_loss + 1.0 * secondary_loss
         if is_main_process():
             if model.training:
                 if self.is_accumulating_eval:
@@ -351,7 +360,8 @@ class AxolotlTrainer(Trainer):
                     self.secondary_loss_tmp = []
                     self.is_accumulating_eval = False
                 self.primary_loss_tmp.append(primary_loss.data.item())
-                self.secondary_loss_tmp.append(secondary_loss.data.item())
+                if secondary_loss is not None:
+                    self.secondary_loss_tmp.append(secondary_loss.data.item())
                 if self.primary_loss_tmp and len(self.primary_loss_tmp) % (self.args.gradient_accumulation_steps * self.args.logging_steps) == 0:
                     step_primary_loss = np.mean(self.primary_loss_tmp)
                     step_secondary_loss = np.mean(self.secondary_loss_tmp)
@@ -366,7 +376,8 @@ class AxolotlTrainer(Trainer):
                     self.secondary_loss_tmp = []
                     self.is_accumulating_eval = True
                 self.primary_loss_tmp.append(primary_loss.data.item())
-                self.secondary_loss_tmp.append(secondary_loss.data.item())
+                if secondary_loss is not None:
+                    self.secondary_loss_tmp.append(secondary_loss.data.item())
         return (loss, model_outputs) if return_outputs else loss
         #return super().compute_loss(model, inputs, return_outputs=return_outputs)
 
