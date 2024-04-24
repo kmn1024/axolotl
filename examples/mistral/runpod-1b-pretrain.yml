@@ -10,6 +10,17 @@ strict: false
 local_streaming_datasets: True
 dataset_columns:
   - 'text'
+# For HuggingFaceFW/fineweb
+# dataset_remove_columns:
+#   - 'id'
+#   - 'dump'
+#   - 'url'
+#   - 'date'
+#   - 'file_path'
+#   - 'language'
+#   - 'language_score'
+#   - 'token_count'
+
 ordered_datasets: False
 datasets:
   - path: '/home/ck/Downloads/data/'
