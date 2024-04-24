@@ -11,12 +11,12 @@ from unidecode import unidecode
 from nltk.corpus import words
 
 def is_special_token(token):
-    special_token_match = r'^<\|[^\s<|>]*\|>$'
-    return re.match(special_token_match, token)
+    return token.startswith('<|') and token.endswith('|>')
 
 def get_words_and_separators(nlp, text):
     special_token_split = r'(<\|[^\s<|>]*\|>)'
     special_token_parts = re.split(special_token_split, text)
+    special_token_parts = [p for p in special_token_parts if len(p) != 0]
     all_tokens, all_separators = [], []
     start = 0
     for part_idx, part in enumerate(special_token_parts):
@@ -31,11 +31,13 @@ def get_words_and_separators(nlp, text):
             assert pos != -1, print(f'{text} \n {tokens} \n violating {start}: {token}')
             # Extract the separator: the part of the string before this token
             if start != 0:
+                # Very first token of text does not have separator.
                 separator = text[start:pos]
                 separators.append(separator)
             # Update 'start' to the end of the token
             start = pos + len(token)
         if part_idx == 0:
+            # Very first token of text does not have separator.
             assert len(separators) == len(tokens) - 1, f'{part}. Tokens: {tokens}, Seps: {separators}'
         else:
             assert len(separators) == len(tokens), f'{part}. Tokens: {tokens}, Seps: {separators}'
