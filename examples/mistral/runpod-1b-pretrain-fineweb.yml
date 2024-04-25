@@ -1,0 +1,100 @@
+base_model: /home/ck/tinymistral_950m-pretrain_refinedweb
+base_model_config: /home/ck/tinymistral_950m-pretrain_refinedweb
+tokenizer_type: AutoTokenizer
+is_mistral_derived_model: true
+
+load_in_8bit: false
+load_in_4bit: false
+strict: false
+
+local_streaming_datasets: True
+dataset_columns:
+  - 'text'
+remove_columns:
+  - 'id'
+  - 'dump'
+  - 'url'
+  - 'date'
+  - 'file_path'
+  - 'language'
+  - 'language_score'
+  - 'token_count'
+ordered_datasets: False
+datasets:
+  - path: '/home/ck/Downloads/fineweb/'
+    name: 'pile'
+    type: completion
+    ds_type: 'parquet'
+
+dataset_prepared_path: /home/ck/dataset_prepared_path
+output_dir: /home/ck/tinymistral_950m-pretrain_fineweb_202350_202410
+
+sequence_len: 4096
+sample_packing: false
+eval_sample_packing: false
+pad_to_sequence_len: false
+
+wandb_project: tinymistral_950m_fineweb_202350_202410
+wandb_entity:
+wandb_watch:
+wandb_run_id:
+wandb_log_model:
+
+dataloader_num_workers: 3
+gradient_accumulation_steps: 5
+micro_batch_size: 26  # only primary loss, A100
+optimizer: adamw_torch
+adam_beta1: 0.9
+adam_beta2: 0.95
+adam_eps: 0.000000005
+lr_scheduler: cosine
+#learning_rate: 0.00005
+learning_rate: 0.0002
+weight_decay: 0.1
+max_grad_norm: 1.0
+
+train_on_inputs: false
+group_by_length: false
+bf16: true
+fp16: false
+tf32: false
+
+gradient_checkpointing: true
+early_stopping_patience:
+resume_from_checkpoint: 
+local_rank:
+xformers_attention:
+flash_attention: true
+
+#A100
+max_steps: 80000  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps*GPUs) = 5847355 / (4096*6*2*2)
+logging_steps: 8  # max_steps * 0.002
+warmup_steps: 640  # max_steps * 0.02
+
+save_steps: 0.02  # 1 / epochs
+
+# # Testing
+# max_steps: 700  # Must for streaming. epochs * steps_per_epoch. steps_per_epoch ~ tokens/(seq_len * micro_batch_size * accum-steps*GPUs) = 5847355 / (4096*6*2*2)
+# logging_steps: 1  # max_steps * 0.002
+# warmup_steps: 20  # max_steps * 0.02
+# save_steps: 0.1  # 1 / epochs
+
+eval_steps:
+eval_batch_size:
+
+val_set_size: 0
+eval_table_size:
+eval_table_max_new_tokens:
+debug:
+deepspeed: deepspeed/zero2_cosine.json
+fsdp:
+fsdp_config:
+special_tokens:
+  pad_token: "<pad>"  # Try "<unk>"?
+  bos_token: "<s>"
+  eos_token: "</s>"
+  unk_token: "<unk>"
+tokens:
+  - "<|system|>"
+  - "<|user|>"
+  - "<|model|>"
