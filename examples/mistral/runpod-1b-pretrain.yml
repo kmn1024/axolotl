@@ -11,15 +11,7 @@ local_streaming_datasets: True
 dataset_columns:
   - 'text'
 # For HuggingFaceFW/fineweb
-# dataset_remove_columns:
-#   - 'id'
-#   - 'dump'
-#   - 'url'
-#   - 'date'
-#   - 'file_path'
-#   - 'language'
-#   - 'language_score'
-#   - 'token_count'
+# keep_only_specified_columns: True
 
 ordered_datasets: False
 datasets:

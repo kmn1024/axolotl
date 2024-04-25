@@ -65,7 +65,16 @@ def md5(to_hash: str, encoding: str = "utf-8") -> str:
         return hashlib.md5(to_hash.encode(encoding), usedforsecurity=False).hexdigest()
     except TypeError:
         return hashlib.md5(to_hash.encode(encoding)).hexdigest()  # nosec
-
+    
+def maybe_filter_columns(dataset, cfg):
+    if cfg.keep_only_specified_columns is not None and cfg.keep_only_specified_columns:
+        cols_to_remove = dataset.column_names
+        for keep_col in cfg.dataset_columns:
+            cols_to_remove.remove(keep_col)
+        print(f"maybe_filter_columns removing: {cols_to_remove}, keeping: {cfg.dataset_columns}")
+        if len(cols_to_remove) > 0:
+            dataset = dataset.remove_columns(cols_to_remove)
+    return dataset
 
 def prepare_dataset(cfg, tokenizer):
     if cfg.local_streaming_datasets:
@@ -224,13 +233,9 @@ def postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming):
         if ds_strategy.supports_batched:
             map_kwargs["batched"] = True
             map_kwargs["batch_size"] = 8
-        remove_columns = cfg.dataset_columns
-        if cfg.dataset_remove_columns is not None:
-            remove_columns += cfg.dataset_remove_columns
-        print(f"Removing columns: {remove_columns}")
         ds = ds.map(
             ds_strategy.tokenize_prompt,
-            remove_columns=remove_columns,
+            remove_columns=cfg.dataset_columns,
             **map_kwargs,
         )
         return ds
@@ -277,6 +282,7 @@ def load_tokenized_prepared_datasets_local_stream(
             streaming=False if is_eval else True,
             split=None,
         )
+        ds = maybe_filter_columns(ds, cfg)
         return ds
     
     if is_eval:
@@ -332,6 +338,7 @@ def load_tokenized_prepared_datasets_local_stream(
                 streaming=True,
                 split=None,
             )
+            ds = maybe_filter_columns(ds, cfg)
             ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
             print(f'Training data {d.name} shards: {ds.n_shards}')
             all_datasets.append(ds)
@@ -369,6 +376,7 @@ def load_tokenized_prepared_datasets_local_stream(
             streaming=True,
             split=None,
         )
+        ds = maybe_filter_columns(ds, cfg)
         dataset = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
         print(f'Training data shards: {dataset.n_shards}')
     return dataset
@@ -405,6 +413,7 @@ def load_tokenized_prepared_datasets(
                 token=use_auth_token,
             )
             dataset = dataset["train"]
+            dataset = maybe_filter_columns(dataset, cfg)
     except Exception:  # pylint: disable=broad-except # nosec
         pass
 
@@ -461,6 +470,7 @@ def load_tokenized_prepared_datasets(
                         streaming=False,
                         split=None,
                     )
+                    ds = maybe_filter_columns(ds, cfg)
                 elif local_path.is_file():
                     ds_type = "json"
                     if d.ds_type:
@@ -480,6 +490,7 @@ def load_tokenized_prepared_datasets(
                         streaming=False,
                         split=None,
                     )
+                    ds = maybe_filter_columns(ds, cfg)
                 else:
                     raise ValueError(
                         "unhandled dataset load: local path exists, but is neither a directory or a file"
@@ -492,6 +503,7 @@ def load_tokenized_prepared_datasets(
                     data_files=d.data_files,
                     token=use_auth_token,
                 )
+                ds = maybe_filter_columns(ds, cfg)
             else:
                 if isinstance(d.data_files, str):
                     fp = hf_hub_download(
@@ -516,6 +528,7 @@ def load_tokenized_prepared_datasets(
                 ds = load_dataset(
                     "json", name=d.name, data_files=fp, streaming=False, split=None
                 )
+                ds = maybe_filter_columns(ds, cfg)
             if not ds:
                 raise ValueError("unhandled dataset load")
             
@@ -593,6 +606,7 @@ def load_prepare_datasets(
                     token=use_auth_token,
                 )
                 dataset = dataset["train"]
+                dataset = maybe_filter_columns(dataset, cfg)
         except Exception:  # pylint: disable=broad-except # nosec
             pass
 
