@@ -67,13 +67,8 @@ def md5(to_hash: str, encoding: str = "utf-8") -> str:
         return hashlib.md5(to_hash.encode(encoding)).hexdigest()  # nosec
     
 def maybe_filter_columns(dataset, cfg):
-    if cfg.keep_only_specified_columns is not None and cfg.keep_only_specified_columns:
-        cols_to_remove = dataset.column_names
-        for keep_col in cfg.dataset_columns:
-            cols_to_remove.remove(keep_col)
-        print(f"maybe_filter_columns removing: {cols_to_remove}, keeping: {cfg.dataset_columns}")
-        if len(cols_to_remove) > 0:
-            dataset = dataset.remove_columns(cols_to_remove)
+    if cfg.remove_columns is not None:
+        dataset = dataset.remove_columns(cfg.remove_columns)
     return dataset
 
 def prepare_dataset(cfg, tokenizer):
@@ -362,6 +357,10 @@ def load_tokenized_prepared_datasets_local_stream(
                     datafiles.append((d, d.name, d.path))
         
         random.shuffle(datafiles)
+        # For quickly resuming from checkpoint by estimating files to skip.
+        num_original = len(datafiles)
+        datafiles = datafiles[0:]
+        print(f'Truncating datafiles: {num_original} -> {len(datafiles)}')
         d = None
         data_files = []
         for this_d, name, path in datafiles:
