@@ -68,7 +68,10 @@ def md5(to_hash: str, encoding: str = "utf-8") -> str:
     
 def maybe_filter_columns(dataset, cfg):
     if cfg.remove_columns is not None:
-        dataset = dataset.remove_columns(cfg.remove_columns)
+        sample = next(iter(dataset['train']))
+        remove_features = [c for c in cfg.remove_columns if c in sample.keys()]
+        print(f"Removing: {remove_features}")
+        dataset = dataset.remove_columns(remove_features)
     return dataset
 
 def prepare_dataset(cfg, tokenizer):
@@ -362,21 +365,22 @@ def load_tokenized_prepared_datasets_local_stream(
         datafiles = datafiles[0:]
         print(f'Truncating datafiles: {num_original} -> {len(datafiles)}')
         d = None
-        data_files = []
+        data_sets = []
         for this_d, name, path in datafiles:
-            data_files.append(path)
             if d is None:
                 d = this_d
             else:
                 assert this_d.ds_type == d.ds_type
-        ds = load_dataset(
-            d.ds_type,
-            data_files=data_files,
-            streaming=True,
-            split=None,
-        )
-        ds = maybe_filter_columns(ds, cfg)
-        dataset = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
+            ds = load_dataset(
+                d.ds_type,
+                data_files=path,
+                streaming=True,
+                split=None,
+            )
+            ds = maybe_filter_columns(ds, cfg)
+            ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
+            data_sets.append(ds)
+        dataset = concatenate_datasets(data_sets)
         print(f'Training data shards: {dataset.n_shards}')
     return dataset
 

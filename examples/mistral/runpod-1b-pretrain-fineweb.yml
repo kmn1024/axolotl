@@ -1,5 +1,5 @@
-base_model: /home/ck/tinymistral_950m-pretrain_refinedweb
-base_model_config: /home/ck/tinymistral_950m-pretrain_refinedweb
+base_model: /home/ck/tinymistral_950m-pretrain_fineweb_202350_202410
+base_model_config: /home/ck/tinymistral_950m-pretrain_fineweb_202350_202410
 tokenizer_type: AutoTokenizer
 is_mistral_derived_model: true
 
@@ -19,22 +19,23 @@ remove_columns:
   - 'language'
   - 'language_score'
   - 'token_count'
+  - 'filter_reason'
 ordered_datasets: False
 datasets:
-  - path: '/home/ck/Downloads/fineweb/'
-    name: 'pile'
+  - path: '/home/ck/Downloads/alldata/'
+    name: 'fineweb'
     type: completion
     ds_type: 'parquet'
 
 dataset_prepared_path: /home/ck/dataset_prepared_path
-output_dir: /home/ck/tinymistral_950m-pretrain_fineweb_202350_202410
+output_dir: /home/ck/tinymistral_950m-pretrain_fineweb_350BT0-7_202418
 
 sequence_len: 4096
 sample_packing: false
 eval_sample_packing: false
 pad_to_sequence_len: false
 
-wandb_project: tinymistral_950m_fineweb_202350_202410
+wandb_project: tinymistral_950m_fineweb_350BT0-3_202418
 wandb_entity:
 wandb_watch:
 wandb_run_id:

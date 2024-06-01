@@ -38,7 +38,8 @@ class TokenizedPromptDataset(Dataset):
         super().__init__(self.process(dataset).data, **kwargs)
 
     def process(self, dataset):
-        features = self.remove_columns if self.remove_columns else dataset.features.keys()
+        features = [c for c in self.remove_columns if c in dataset.features.keys()] if self.remove_columns else dataset.features.keys()
+        print(f"Removing: {features}")
         num_proc = min(64, int(os.cpu_count() * 0.8))
         map_kwargs = {}
         if self.prompt_tokenizer.supports_batched:
