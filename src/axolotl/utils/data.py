@@ -365,7 +365,7 @@ def load_tokenized_prepared_datasets_local_stream(
         datafiles = datafiles[0:]
         print(f'Truncating datafiles: {num_original} -> {len(datafiles)}')
         d = None
-        data_sets = []
+        data_sets, sizes = [], []
         for this_d, name, path in datafiles:
             if d is None:
                 d = this_d
@@ -380,7 +380,11 @@ def load_tokenized_prepared_datasets_local_stream(
             ds = maybe_filter_columns(ds, cfg)
             ds = postprocess_and_wrap_dataset(d, seed, ds, cfg, tokenizer, is_streaming=True)
             data_sets.append(ds)
-        dataset = concatenate_datasets(data_sets)
+            sizes.append(os.stat(path).st_size / (1024*1024))
+        # Random interleave.
+        probs = [one_size/sum(sizes) for one_size in sizes]
+        dataset = interleave_datasets(data_sets, probabilities=probs, stopping_strategy='all_exhausted')
+        #dataset = concatenate_datasets(data_sets)
         print(f'Training data shards: {dataset.n_shards}')
     return dataset
 
